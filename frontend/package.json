@@ -1,0 +1,107 @@
+{
+  "name": "nexus-dl-frontend",
+  "version": "2.0.0",
+  "description": "🧬 NexusDL 2.0 - Interface Web pour le téléchargement de scans (manga, manhwa, webtoon, doujinshi)",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "author": "NexusDL Community <nexusdl@example.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexus-dl/nexus-dl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nexus-dl/nexus-dl/issues"
+  },
+  "homepage": "https://github.com/nexus-dl/nexus-dl#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "serve": "vite preview --host 0.0.0.0 --port 4173",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
+    "type-check": "vue-tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:run": "vitest run",
+    "clean": "rm -rf dist .vite-cache coverage",
+    "build:prod": "npm run type-check && npm run build"
+  },
+  "dependencies": {
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.2",
+    "pinia": "^2.1.7",
+    "axios": "^1.7.2",
+    "@vueuse/core": "^10.11.0",
+    "dayjs": "^1.11.11"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.11",
+    "vite-plugin-pwa": "^0.20.0",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-vue-devtools": "^7.1.0",
+    "sass": "^1.77.4",
+    "autoprefixer": "^10.4.19",
+    "cssnano": "^7.0.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.26.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5",
+    "vue-tsc": "^2.0.19",
+    "vitest": "^1.6.0",
+    "@vitest/ui": "^1.6.0",
+    "jsdom": "^24.0.0",
+    "@vue/test-utils": "^2.4.6"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
+  "optionalDependencies": {
+    "@rollup/plugin-brotli": "^3.1.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not IE 11"
+  ],
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "es5",
+    "printWidth": 100,
+    "bracketSpacing": true,
+    "vueIndentScriptAndStyle": false
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "browser": true,
+      "es2021": true,
+      "node": true
+    },
+    "extends": [
+      "eslint:recommended",
+      "plugin:vue/vue3-recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    },
+    "rules": {
+      "vue/multi-word-component-names": "off",
+      "vue/no-v-html": "off",
+      "no-console": "off",
+      "no-debugger": "warn"
+    }
+  }
+}
