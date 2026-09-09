@@ -1,145 +1,131 @@
 # ==========================================================================
-#  NexusDL 2.0 - Backend Dockerfile
-#  Fichier : backend/Dockerfile
-#  Description : Image Docker complète pour le backend FastAPI
+#  NexusDL 2.0 - Frontend Dockerfile
+#  Fichier : frontend/Dockerfile
+#  Description : Image Docker pour l'interface Vue.js 3 avec Nginx
+#  Architecture : Multi-stage (builder + production)
 #  Version : 2.0.0
-#
-#  Utilisation sur Render : 
-#    - Root Directory : .
-#    - Dockerfile Path : backend/Dockerfile
 # ==========================================================================
 
-# ==========================================================================
-#  STAGE 1 : BUILDER - Installation des dépendances Python
-# ==========================================================================
+# --------------------------------------------------------------------------
+#  STAGE 1 : BUILDER - Construction de l'application Vue.js
+# --------------------------------------------------------------------------
 
-FROM python:3.10-slim AS builder
+FROM node:20-alpine AS builder
 
 # --- Configuration ---
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100
+ENV NODE_ENV=production \
+    NPM_CONFIG_LOGLEVEL=warn \
+    NPM_CONFIG_CACHE=/tmp/.npm-cache \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NPM_CONFIG_FUND=false
 
-# --- Dépendances système pour la compilation ---
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    gnupg \
-    ca-certificates \
-    unzip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/archives/*
+# --- Arguments de build ---
+ARG BUILD_DATE=2025-01-15T00:00:00Z
+ARG VERSION=2.0.0
+ARG GIT_COMMIT=unknown
+ARG API_BACKEND_URL=http://backend:8000
 
-# --- Copier requirements et installer les dépendances ---
-WORKDIR /build
-COPY requirements.txt .
+# --- Métadonnées de l'image (builder) ---
+LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
+      org.opencontainers.image.title="NexusDL Frontend (Builder)" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.build-date="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.description="NexusDL 2.0 - Frontend Vue.js 3 (builder stage)" \
+      org.opencontainers.image.licenses="GPL-3.0-only"
 
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# --- Définir le répertoire de travail ---
+WORKDIR /app
 
-# ==========================================================================
-#  STAGE 2 : PLAYWRIGHT - Installation du navigateur
-# ==========================================================================
+# --- Copier les fichiers de dépendances (pour profiter du cache Docker) ---
+COPY package*.json ./
+COPY .npmrc ./
 
-FROM builder AS playwright-installer
+# --- Installer les dépendances avec npm ci (plus rapide et fiable) ---
+RUN npm ci --only=production --no-audit --no-fund --no-progress \
+    && npm cache clean --force \
+    && rm -rf /tmp/.npm-cache
 
-# Installer Playwright et Chromium
-RUN pip install --no-cache-dir --prefix=/install playwright==1.41.1 \
-    && /install/bin/playwright install chromium \
-    && /install/bin/playwright install-deps
+# --- Copier le reste du code source ---
+COPY . .
 
-# ==========================================================================
-#  STAGE 3 : PRODUCTION - Image finale légère
-# ==========================================================================
+# --- Définir les variables d'environnement pour la construction ---
+ENV VITE_API_BASE=/api \
+    VITE_APP_VERSION=${VERSION} \
+    VITE_API_BACKEND_URL=${API_BACKEND_URL} \
+    VITE_BUILD_DATE=${BUILD_DATE}
 
-FROM python:3.10-slim AS production
+# --- Construire l'application avec Vite ---
+RUN npm run build
 
-# --- Configuration ---
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    TZ=Europe/Paris \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    PYTHONMALLOC=debug
+# --- Nettoyer les fichiers inutiles pour réduire la taille ---
+RUN find dist -name "*.map" -type f -delete \
+    && rm -rf dist/assets/*.br dist/assets/*.gz \
+    && find dist -type d -empty -delete
 
-# --- Variables d'environnement par défaut ---
-ENV ENV=production \
-    HOST=0.0.0.0 \
-    PORT=8000
+# --- Optimisation : compression Brotli des assets (optionnel) ---
+# RUN npm install -g brotli && find dist -type f -name "*.js" -o -name "*.css" -o -name "*.html" | xargs -I {} brotli -f -q 11 {}
 
-# --- Métadonnées de l'image ---
+# --------------------------------------------------------------------------
+#  STAGE 2 : PRODUCTION - Serveur Nginx
+# --------------------------------------------------------------------------
+
+FROM nginx:alpine AS production
+
+# --- Arguments de build ---
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 ARG GIT_COMMIT=unknown
 
+# --- Métadonnées de l'image finale ---
 LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
-      org.opencontainers.image.title="NexusDL Backend" \
+      org.opencontainers.image.title="NexusDL Frontend" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.build-date="${BUILD_DATE}" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.description="NexusDL 2.0 - Moteur universel de téléchargement de scans" \
+      org.opencontainers.image.description="NexusDL 2.0 - Interface Web Vue.js 3 avec Nginx" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
-# --- Dépendances système minimales pour le runtime (Playwright) ---
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Pour Playwright
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libxkbcommon0 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libatspi2.0-0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libasound2 \
-    # Pour healthcheck
+# --- Installation des utilitaires supplémentaires ---
+RUN apk add --no-cache \
     curl \
-    # Utilitaires
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/archives/*
+    tzdata \
+    && cp /usr/share/zoneinfo/Europe/Paris /etc/localtime \
+    && echo "Europe/Paris" > /etc/timezone \
+    && apk del tzdata
 
-# --- Création de l'utilisateur non-root ---
-RUN groupadd -r nexusdl && useradd -r -g nexusdl nexusdl \
-    && mkdir -p /app/data/downloads /app/data/cache /app/data/temp /app/logs \
-    && chown -R nexusdl:nexusdl /app
+# --- Créer un utilisateur non-root pour Nginx ---
+RUN addgroup -g 101 -S nginx && adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx
 
-# --- Copier les dépendances depuis le builder ---
-COPY --from=playwright-installer /install /usr/local
-COPY --from=playwright-installer /root/.cache/ms-playwright /ms-playwright
+# --- Copier la configuration Nginx personnalisée ---
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# --- Copier le code source de l'application ---
-WORKDIR /app
+# --- Copier les fichiers construits depuis le builder ---
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
-# ✅ IMPORTANT : Le contexte de build doit être la racine du projet
-#    Les fichiers sont copiés depuis le dossier backend/
-COPY ./app ./app
-COPY .env .env
+# --- Créer les dossiers nécessaires et ajuster les permissions ---
+RUN mkdir -p /var/cache/nginx /var/log/nginx /usr/share/nginx/html/static /usr/share/nginx/html/icons \
+    && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /usr/share/nginx/html \
+    && chmod -R 755 /var/cache/nginx /var/log/nginx \
+    && chmod -R 755 /usr/share/nginx/html \
+    && touch /var/run/nginx.pid \
+    && chown nginx:nginx /var/run/nginx.pid
 
-# --- Ajuster les permissions ---
-RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
-    && chmod +x /usr/local/bin/playwright
+# --- Vérifier que la configuration Nginx est valide ---
+RUN nginx -t
 
 # --- Utilisateur non-root ---
-USER nexusdl
+USER nginx
 
-# --- Exposer le port ---
-EXPOSE 8000
+# --- Exposer les ports ---
+EXPOSE 80 443
 
-# --- Healthcheck ---
+# --- Healthcheck pour Docker ---
 HEALTHCHECK --interval=30s \
             --timeout=10s \
-            --start-period=45s \
+            --start-period=15s \
             --retries=5 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost/nginx-health || exit 1
 
 # --- Point d'entrée ---
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["nginx", "-g", "daemon off;"]
