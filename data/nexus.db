@@ -1,6 +1,6 @@
 -- ==========================================================================
 --  NexusDL 2.0 - Base de données SQLite
---  Fichier : data/nexus.db
+--  Fichier : data/nexus.db 
 --  Version : 2.0.0
 --  Description : Schéma complet de la base de données NexusDL
 -- ==========================================================================
