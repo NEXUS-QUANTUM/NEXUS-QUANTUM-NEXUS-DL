@@ -1,0 +1,256 @@
+# ==========================================================================
+#  NexusDL 2.0 - Docker Compose Configuration
+#  Version: 2.0.0
+#  Fichier : docker-compose.yml
+# ==========================================================================
+
+version: '3.8'
+
+networks:
+  nexus_network:
+    driver: bridge
+    name: nexus_network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  nexus_data:
+    driver: local
+    name: nexus_data
+  nexus_logs:
+    driver: local
+    name: nexus_logs
+
+services:
+  # ========================================================================
+  #  BACKEND - FastAPI Server
+  # ========================================================================
+  backend:
+    container_name: nexus-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        - BUILD_DATE=${BUILD_DATE:-2025-01-15T00:00:00Z}
+        - VERSION=${APP_VERSION:-2.0.0}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Application
+      - ENV=${ENV:-production}
+      - APP_NAME=${APP_NAME:-NexusDL}
+      - APP_VERSION=${APP_VERSION:-2.0.0}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Serveur
+      - HOST=0.0.0.0
+      - PORT=8000
+      
+      # Base de données
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/nexus.db}
+      
+      # Sécurité
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-please-use-strong-key}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:5173","http://localhost","http://localhost:80"]}
+      
+      # Téléchargements
+      - MAX_THREADS=${MAX_THREADS:-10}
+      - DOWNLOAD_TIMEOUT=${DOWNLOAD_TIMEOUT:-30}
+      - DOWNLOAD_RETRY=${DOWNLOAD_RETRY:-3}
+      - DOWNLOAD_PATH=${DOWNLOAD_PATH:-./data/downloads}
+      - TEMP_PATH=${TEMP_PATH:-./data/temp}
+      
+      # Cache
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-500}
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      
+      # Rate Limiting
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+    volumes:
+      # Données persistantes
+      - nexus_data:/app/data
+      # Logs
+      - nexus_logs:/app/logs
+      # Fichiers de configuration (optionnel)
+      - ./backend/app:/app/app:ro
+      - ./.env:/app/.env:ro
+    networks:
+      nexus_network:
+        ipv4_address: 172.20.0.10
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"  # Optionnel : exposer pour debug
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    init: true
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+
+  # ========================================================================
+  #  FRONTEND - Vue.js 3 + Nginx
+  # ========================================================================
+  frontend:
+    container_name: nexus-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - BUILD_DATE=${BUILD_DATE:-2025-01-15T00:00:00Z}
+        - VERSION=${APP_VERSION:-2.0.0}
+        - API_BACKEND_URL=${API_BACKEND_URL:-http://backend:8000}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - API_BACKEND_URL=${API_BACKEND_URL:-http://backend:8000}
+      - VITE_API_BASE=${VITE_API_BASE:-/api}
+      - VITE_APP_VERSION=${APP_VERSION:-2.0.0}
+      - NGINX_HOST=${NGINX_HOST:-localhost}
+      - NGINX_PORT=${NGINX_PORT:-80}
+    volumes:
+      # Configuration Nginx personnalisée (optionnel)
+      - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Assets statiques persistants
+      - ./data/static:/usr/share/nginx/html/static:ro
+      # Cache Nginx
+      - ./data/nginx-cache:/var/cache/nginx
+      # Logs Nginx
+      - nexus_logs:/var/log/nginx
+    networks:
+      nexus_network:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "80:80"           # HTTP principal
+      - "443:443"         # HTTPS (si configuré)
+      - "5173:5173"       # Development (optionnel)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    init: true
+    stop_signal: SIGTERM
+    stop_grace_period: 20s
+
+  # ========================================================================
+  #  PROMETHEUS - Monitoring (Optionnel)
+  # ========================================================================
+  # prometheus:
+  #   container_name: nexus-prometheus
+  #   image: prom/prometheus:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - nexus_data:/prometheus
+  #   networks:
+  #     - nexus_network
+  #   ports:
+  #     - "9090:9090"
+  #   depends_on:
+  #     - backend
+  #   profiles:
+  #     - monitoring
+
+  # ========================================================================
+  #  GRAFANA - Visualisation (Optionnel)
+  # ========================================================================
+  # grafana:
+  #   container_name: nexus-grafana
+  #   image: grafana/grafana:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./monitoring/grafana.ini:/etc/grafana/grafana.ini
+  #     - nexus_data:/var/lib/grafana
+  #   networks:
+  #     - nexus_network
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - prometheus
+  #   profiles:
+  #     - monitoring
+
+  # ========================================================================
+  #  REDIS - Cache distribué (Optionnel)
+  # ========================================================================
+  # redis:
+  #   container_name: nexus-redis
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - nexus_data:/data
+  #   networks:
+  #     - nexus_network
+  #   ports:
+  #     - "6379:6379"
+  #   profiles:
+  #     - cache
+
+  # ========================================================================
+  #  NGINX PROXY MANAGER - Reverse Proxy (Optionnel)
+  # ========================================================================
+  # nginx-proxy-manager:
+  #   container_name: nexus-nginx-proxy
+  #   image: jc21/nginx-proxy-manager:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - nexus_data:/data
+  #     - nexus_logs:/var/log/nginx
+  #   networks:
+  #     - nexus_network
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #     - "81:81"
+  #   depends_on:
+  #     - backend
+  #     - frontend
+  #   profiles:
+  #     - proxy
