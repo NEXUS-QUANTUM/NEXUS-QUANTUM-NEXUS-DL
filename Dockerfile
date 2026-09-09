@@ -1,5 +1,5 @@
 # ==========================================================================
-#  NexusDL 2.0 - Dockerfile (version robuste avec fichiers de config)
+#  NexusDL 2.0 - Dockerfile (corrigé, sans dépendances externes)
 #  Fichier : Dockerfile
 #  Description : Image unique backend + frontend pour Render.com
 #  Version : 2.0.0
@@ -20,35 +20,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 
-LABEL maintainer="NexusDL Community <drxenon487@gmail.com>" \
+LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.build-date="${BUILD_DATE}"
 
-# Dépendances système pour Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    gnupg \
-    ca-certificates \
-    unzip \
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libxkbcommon0 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libatspi2.0-0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libasound2 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    curl wget gnupg ca-certificates unzip \
+    libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgbm1 \
+    libpango-1.0-0 libcairo2 libatspi2.0-0 libx11-6 libxcomposite1 \
+    libxdamage1 libxext6 libxfixes3 libxrandr2 libasound2 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY backend/requirements.txt .
@@ -103,11 +85,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Installation de Nginx, Supervisor et outils
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    supervisor \
-    curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    nginx supervisor curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Création de l'utilisateur non-root
 RUN groupadd -r nexusdl && useradd -r -g nexusdl nexusdl \
@@ -126,9 +105,128 @@ COPY .env .env
 # Copie du frontend construit
 COPY --from=builder-node /build/dist /var/www/html
 
-# Copie des fichiers de configuration Nginx et Supervisor
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY supervisord.conf /etc/supervisor/conf.d/nexusdl.conf
+# ----------------------------------------------------------------
+# ✅ CRÉATION DES FICHIERS DE CONFIGURATION DIRECTEMENT DANS LE DOCKERFILE
+# ----------------------------------------------------------------
+
+# Création de nginx.conf
+RUN echo 'worker_processes auto;' > /etc/nginx/nginx.conf && \
+    echo 'error_log /var/log/nginx/error.log warn;' >> /etc/nginx/nginx.conf && \
+    echo 'pid /var/run/nginx.pid;' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo 'events {' >> /etc/nginx/nginx.conf && \
+    echo '    worker_connections 1024;' >> /etc/nginx/nginx.conf && \
+    echo '    multi_accept on;' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo 'http {' >> /etc/nginx/nginx.conf && \
+    echo '    include /etc/nginx/mime.types;' >> /etc/nginx/nginx.conf && \
+    echo '    default_type application/octet-stream;' >> /etc/nginx/nginx.conf && \
+    echo '    sendfile on;' >> /etc/nginx/nginx.conf && \
+    echo '    tcp_nopush on;' >> /etc/nginx/nginx.conf && \
+    echo '    tcp_nodelay on;' >> /etc/nginx/nginx.conf && \
+    echo '    keepalive_timeout 65;' >> /etc/nginx/nginx.conf && \
+    echo '    client_max_body_size 100M;' >> /etc/nginx/nginx.conf && \
+    echo '    server_tokens off;' >> /etc/nginx/nginx.conf && \
+    echo '    gzip on;' >> /etc/nginx/nginx.conf && \
+    echo '    gzip_vary on;' >> /etc/nginx/nginx.conf && \
+    echo '    gzip_proxied any;' >> /etc/nginx/nginx.conf && \
+    echo '    gzip_comp_level 6;' >> /etc/nginx/nginx.conf && \
+    echo '    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss image/svg+xml;' >> /etc/nginx/nginx.conf && \
+    echo '    server {' >> /etc/nginx/nginx.conf && \
+    echo '        listen 80 default_server;' >> /etc/nginx/nginx.conf && \
+    echo '        listen [::]:80 default_server;' >> /etc/nginx/nginx.conf && \
+    echo '        server_name _;' >> /etc/nginx/nginx.conf && \
+    echo '        root /var/www/html;' >> /etc/nginx/nginx.conf && \
+    echo '        index index.html;' >> /etc/nginx/nginx.conf && \
+    echo '        location /api/ {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8000/;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_http_version 1.1;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Upgrade \$http_upgrade;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Connection "upgrade";' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host \$host;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Real-IP \$remote_addr;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Forwarded-Proto \$scheme;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_connect_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_send_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_read_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_buffering off;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /docs {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8000/docs;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host \$host;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /redoc {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8000/redoc;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host \$host;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /openapi.json {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8000/openapi.json;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host \$host;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /ws/ {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8000/ws/;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_http_version 1.1;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Upgrade \$http_upgrade;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Connection "upgrade";' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host \$host;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Real-IP \$remote_addr;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header X-Forwarded-Proto \$scheme;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_connect_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_send_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_read_timeout 600s;' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_buffering off;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /nginx-health {' >> /etc/nginx/nginx.conf && \
+    echo '            access_log off;' >> /etc/nginx/nginx.conf && \
+    echo '            return 200 "healthy\\n";' >> /etc/nginx/nginx.conf && \
+    echo '            add_header Content-Type text/plain;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location / {' >> /etc/nginx/nginx.conf && \
+    echo '            try_files \$uri \$uri/ /index.html;' >> /etc/nginx/nginx.conf && \
+    echo '            add_header Cache-Control "no-cache, no-store, must-revalidate";' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        error_page 404 /index.html;' >> /etc/nginx/nginx.conf && \
+    echo '        error_page 500 502 503 504 /50x.html;' >> /etc/nginx/nginx.conf && \
+    echo '        location = /50x.html {' >> /etc/nginx/nginx.conf && \
+    echo '            root /usr/share/nginx/html;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '    }' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf
+
+# Création de supervisord.conf
+RUN echo '[supervisord]' > /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'nodaemon=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'user=nexusdl' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'logfile=/app/logs/supervisord.log' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'pidfile=/var/run/supervisord.pid' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'loglevel=info' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo '' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo '[program:backend]' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'command=uvicorn app.main:app --host 0.0.0.0 --port 8000' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'directory=/app' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'environment=PYTHONPATH="/app",TZ="Europe/Paris"' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'user=nexusdl' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stdout_logfile=/app/logs/backend-out.log' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stderr_logfile=/app/logs/backend-err.log' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'redirect_stderr=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stopasgroup=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'killasgroup=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo '' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo '[program:nginx]' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'command=nginx -g "daemon off;"' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'user=root' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stdout_logfile=/app/logs/nginx-out.log' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stderr_logfile=/app/logs/nginx-err.log' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'redirect_stderr=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'stopasgroup=true' >> /etc/supervisor/conf.d/nexusdl.conf && \
+    echo 'killasgroup=true' >> /etc/supervisor/conf.d/nexusdl.conf
 
 # Suppression du site par défaut et vérification Nginx
 RUN rm -f /etc/nginx/sites-enabled/default && nginx -t
