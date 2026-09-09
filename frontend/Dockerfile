@@ -1,9 +1,10 @@
 # ==========================================================================
-#  NexusDL 2.0 - Frontend Dockerfile
+#  NexusDL 2.0 - Frontend Dockerfile (corrigé)
 #  Fichier : frontend/Dockerfile
 #  Description : Image Docker pour l'interface Vue.js 3 avec Nginx
-#  Architecture : Multi-stage (builder + production)
 #  Version : 2.0.0
+#  Architecture : Multi-stage (builder Node.js + production Nginx)
+#  Corrections : utilisation de npm install (pas de package-lock.json)
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -12,7 +13,7 @@
 
 FROM node:20-alpine AS builder
 
-# --- Configuration ---
+# --- Configuration pour optimiser les builds ---
 ENV NODE_ENV=production \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_CACHE=/tmp/.npm-cache \
@@ -41,8 +42,10 @@ WORKDIR /app
 COPY package*.json ./
 COPY .npmrc ./
 
-# --- Installer les dépendances avec npm ci (plus rapide et fiable) ---
-RUN npm ci --only=production --no-audit --no-fund --no-progress \
+# --- Installer les dépendances avec npm install (pas de package-lock.json) ---
+# On utilise `npm install --omit=dev` pour n'installer que les dépendances de production.
+# L'option `--omit=dev` est l'équivalent moderne de `--only=production`.
+RUN npm install --omit=dev --no-audit --no-fund --no-progress \
     && npm cache clean --force \
     && rm -rf /tmp/.npm-cache
 
@@ -62,9 +65,6 @@ RUN npm run build
 RUN find dist -name "*.map" -type f -delete \
     && rm -rf dist/assets/*.br dist/assets/*.gz \
     && find dist -type d -empty -delete
-
-# --- Optimisation : compression Brotli des assets (optionnel) ---
-# RUN npm install -g brotli && find dist -type f -name "*.js" -o -name "*.css" -o -name "*.html" | xargs -I {} brotli -f -q 11 {}
 
 # --------------------------------------------------------------------------
 #  STAGE 2 : PRODUCTION - Serveur Nginx
@@ -86,7 +86,7 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.description="NexusDL 2.0 - Interface Web Vue.js 3 avec Nginx" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
-# --- Installation des utilitaires supplémentaires ---
+# --- Installation d'utilitaires supplémentaires ---
 RUN apk add --no-cache \
     curl \
     tzdata \
