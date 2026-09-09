@@ -1,6 +1,6 @@
 # ==========================================================================
 #  NexusDL 2.0 - WebSocket Endpoints
-#  Fichier : backend/app/api/v1/endpoints/websocket.py
+#  Fichier : backend/app/api/v1/endpoints/websocket.py 
 # ==========================================================================
 
 import logging
