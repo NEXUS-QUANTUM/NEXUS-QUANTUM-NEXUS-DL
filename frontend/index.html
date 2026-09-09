@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <!-- ====================================================================
+      SECTION 1 - META DE BASE ET CARACTÉRISTIQUES TECHNIQUES
+      ==================================================================== -->
+
+    <!-- Jeu de caractères -->
+    <meta charset="UTF-8" />
+
+    <!-- Viewport responsive (mobile-first) -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
+    />
+
+    <!-- Thème de la barre d'adresse / navigation mobile -->
+    <meta name="theme-color" content="#0a0e1a" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Capacité PWA (Progressive Web App) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NexusDL" />
+
+    <!-- ICÔNES ET FAVICONS -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="mask-icon" href="/favicon.svg" color="#00d4ff" />
+    <meta name="msapplication-TileColor" content="#0a0e1a" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+
+    <!-- ====================================================================
+      SECTION 2 - SEO (Search Engine Optimization) COMPLET
+      ==================================================================== -->
+
+    <!-- Titre principal (60 caractères max recommandé) -->
+    <title>
+      NexusDL 2.0 — Moteur universel de téléchargement de mangas, manhwas, webtoons et doujinshi
+    </title>
+
+    <!-- Description (160 caractères max) -->
+    <meta
+      name="description"
+      content="🧬 NexusDL 2.0 - Téléchargez automatiquement mangas, manhwas, webtoons et doujinshi depuis plus de 50 sites de scan. Interface moderne, téléchargement parallèle, export CBZ, support Playwright."
+    />
+
+    <!-- Mots-clés (pour les moteurs de recherche) -->
+    <meta
+      name="keywords"
+      content="manga, manhwa, webtoon, doujinshi, scan, téléchargement, CBZ, FastAPI, Vue.js, NexusDL, scan-manga, sushiscan, asurascans, mangadex, nhentai, hentaizone, pururin, madara, téléchargeur manga, lecteur cbz, scanlation, scan fr, scan en, scan nsfw, download manga, manhwa downloader, webtoon downloader"
+    />
+
+    <!-- Robots : indexer et suivre les liens -->
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+
+    <!-- Auteur et copyright -->
+    <meta name="author" content="NexusDL Community" />
+    <meta name="copyright" content="NexusDL Community" />
+
+    <!-- Ré-identification pour les crawlers (canonical) -->
+    <link rel="canonical" href="https://nexusdl.local/" />
+
+    <!-- ====================================================================
+      SECTION 3 - OPEN GRAPH (Facebook, LinkedIn, etc.)
+      ==================================================================== -->
+
+    <meta property="og:title" content="NexusDL 2.0 — Moteur universel de téléchargement de scans" />
+    <meta
+      property="og:description"
+      content="🧬 NexusDL 2.0 - Téléchargez automatiquement mangas, manhwas, webtoons et doujinshi depuis plus de 50 sites de scan. Interface moderne, téléchargement parallèle, export CBZ."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://nexusdl.local/" />
+    <meta property="og:image" content="/icons/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="NexusDL 2.0 - Interface de téléchargement de scans" />
+    <meta property="og:site_name" content="NexusDL" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:updated_time" content="2025-01-15T00:00:00Z" />
+
+    <!-- ====================================================================
+      SECTION 4 - TWITTER CARDS
+      ==================================================================== -->
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="NexusDL 2.0 — Moteur universel de téléchargement de scans" />
+    <meta
+      name="twitter:description"
+      content="🧬 NexusDL 2.0 - Téléchargez automatiquement mangas, manhwas, webtoons et doujinshi depuis plus de 50 sites de scan."
+    />
+    <meta name="twitter:image" content="/icons/og-image.png" />
+    <meta name="twitter:image:alt" content="NexusDL 2.0 - Interface de téléchargement de scans" />
+    <meta name="twitter:site" content="@nexusdl" />
+    <meta name="twitter:creator" content="@nexusdl" />
+
+    <!-- ====================================================================
+      SECTION 5 - JSON-LD (Schema.org) - Données structurées pour moteurs
+      ==================================================================== -->
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "NexusDL",
+        "version": "2.0.0",
+        "description": "Moteur universel de téléchargement de scans (manga, manhwa, webtoon, doujinshi) compatible avec plus de 50 sites de scan.",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "Linux, macOS, Windows",
+        "browserRequirements": "Nécessite un navigateur moderne (Chrome, Firefox, Edge, Safari)",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "EUR"
+        },
+        "featureList": [
+          "Support de 50+ sites de scan",
+          "Téléchargement parallèle asynchrone",
+          "Export CBZ avec ComicInfo.xml",
+          "Interface Web Vue.js 3",
+          "Support Playwright pour sites JS/Cloudflare",
+          "Authentification JWT",
+          "WebSocket en temps réel",
+          "Gestion de bibliothèque avec couvertures",
+          "Recherche et filtrage avancés"
+        ],
+        "supportedLanguages": ["fr", "en"],
+        "applicationSubCategory": "Comic Book Downloader",
+        "softwareVersion": "2.0.0",
+        "releaseNotes": "Nouvelle architecture Nexus, support étendu, interface refondue",
+        "url": "https://nexusdl.local/",
+        "author": {
+          "@type": "Organization",
+          "name": "NexusDL Community"
+        },
+        "license": {
+          "@type": "CreativeWork",
+          "name": "GNU General Public License v3.0",
+          "url": "https://www.gnu.org/licenses/gpl-3.0.html"
+        }
+      }
+    </script>
+
+    <!-- ====================================================================
+      SECTION 6 - PRÉCHARGEMENTS ET OPTIMISATIONS DE PERFORMANCE
+      ==================================================================== -->
+
+    <!-- Préconnexion aux domaines tiers -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="/api" />
+    <link rel="preconnect" href="https://api.mangadex.org" />
+    <link rel="preconnect" href="https://uploads.mangadex.org" />
+
+    <!-- Préchargement des ressources critiques -->
+    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
+    <link rel="preload" href="/src/main.js" as="script" />
+    <link rel="preload" href="/src/assets/styles/global.scss" as="style" />
+    <link rel="preload" href="/src/assets/styles/nexus-theme.scss" as="style" />
+
+    <!-- ====================================================================
+      SECTION 7 - POLITIQUE DE SÉCURITÉ (CSP) - Activable en production
+      ==================================================================== -->
+    <!--
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: https:;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' http://localhost:8000 http://backend:8000 https://api.mangadex.org https://uploads.mangadex.org;
+      frame-ancestors 'self';
+      base-uri 'self';
+      form-action 'self';
+      upgrade-insecure-requests;
+    " />
+    -->
+
+    <!-- ====================================================================
+      SECTION 8 - STYLE DU LOADER (affiché avant le chargement du JS)
+      ==================================================================== -->
+
+    <style>
+      /* Reset minimal pour le loader */
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        background: #0a0e1a;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+      }
+
+      /* --- LOADER PRINCIPAL --- */
+      .nexus-loader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #0a0e1a;
+        z-index: 99999;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+
+      .nexus-loader.hide {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* --- SPINNER --- */
+      .nexus-loader__spinner {
+        width: 64px;
+        height: 64px;
+        border: 4px solid rgba(26, 37, 56, 0.6);
+        border-top-color: #00d4ff;
+        border-right-color: #0066ff;
+        border-radius: 50%;
+        animation: nexusLoaderSpin 0.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+        margin-bottom: 1.2rem;
+        position: relative;
+      }
+
+      /* Effet de lueur autour du spinner */
+      .nexus-loader__spinner::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        right: -4px;
+        bottom: -4px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+        opacity: 0.4;
+        animation: nexusLoaderGlow 1.8s ease-in-out infinite alternate;
+      }
+
+      @keyframes nexusLoaderSpin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes nexusLoaderGlow {
+        0% {
+          opacity: 0.2;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0.6;
+          transform: scale(1.08);
+        }
+      }
+
+      /* --- TEXTE DU LOGO --- */
+      .nexus-loader__brand {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        background: linear-gradient(135deg, #00d4ff 0%, #0066ff 50%, #00d4ff 100%);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: nexusLoaderGradient 3s ease-in-out infinite;
+      }
+
+      .nexus-loader__brand-icon {
+        font-size: 1.6rem;
+        -webkit-text-fill-color: initial;
+        filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.3));
+      }
+
+      @keyframes nexusLoaderGradient {
+        0%,
+        100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
+
+      .nexus-loader__version {
+        font-size: 0.7rem;
+        color: #4a6a8a;
+        margin-top: 0.3rem;
+        -webkit-text-fill-color: #4a6a8a;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+      }
+
+      .nexus-loader__sub {
+        font-size: 0.8rem;
+        color: #4a6a8a;
+        margin-top: 0.1rem;
+        -webkit-text-fill-color: #4a6a8a;
+        font-weight: 300;
+        letter-spacing: 0.05em;
+        opacity: 0.7;
+      }
+
+      /* --- BARRE DE PROGRESSION (indicatrice de chargement) --- */
+      .nexus-loader__progress {
+        width: 200px;
+        max-width: 70vw;
+        height: 3px;
+        background: rgba(26, 37, 56, 0.6);
+        border-radius: 4px;
+        margin-top: 1.2rem;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .nexus-loader__progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00d4ff, #0066ff);
+        border-radius: 4px;
+        animation: nexusLoaderProgress 2.5s ease-in-out infinite;
+        position: relative;
+      }
+
+      @keyframes nexusLoaderProgress {
+        0% {
+          width: 0%;
+          transform: translateX(0);
+        }
+        20% {
+          width: 25%;
+        }
+        50% {
+          width: 55%;
+        }
+        80% {
+          width: 80%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+
+      /* --- SUPPORT DU THÈME CLAIR --- */
+      @media (prefers-color-scheme: light) {
+        html,
+        body {
+          background: #f4f6fa;
+        }
+        .nexus-loader {
+          background: #f4f6fa;
+        }
+        .nexus-loader__version {
+          color: #7a8a9a;
+          -webkit-text-fill-color: #7a8a9a;
+        }
+        .nexus-loader__sub {
+          color: #7a8a9a;
+          -webkit-text-fill-color: #7a8a9a;
+        }
+        .nexus-loader__spinner {
+          border-color: rgba(208, 216, 224, 0.6);
+          border-top-color: #0066cc;
+          border-right-color: #0044b3;
+        }
+        .nexus-loader__progress {
+          background: rgba(208, 216, 224, 0.4);
+        }
+        .nexus-loader__progress-bar {
+          background: linear-gradient(90deg, #0066cc, #0044b3);
+        }
+        .nexus-loader__brand {
+          background: linear-gradient(135deg, #0066cc 0%, #0044b3 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+        }
+      }
+
+      /* --- MODE SOMBRE FORCÉ (si le thème système est sombre) --- */
+      @media (prefers-color-scheme: dark) {
+        .nexus-loader__spinner {
+          border-color: rgba(26, 37, 56, 0.8);
+          border-top-color: #00d4ff;
+          border-right-color: #0066ff;
+        }
+      }
+
+      /* --- ÉVITER LE CLIGNOTEMENT SUR LES ÉCRANS LENTS --- */
+      .nexus-loader {
+        animation: nexusLoaderFadeIn 0.3s ease;
+      }
+
+      @keyframes nexusLoaderFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+    </style>
+
+    <!-- ====================================================================
+      SECTION 9 - SCRIPT DE CONTRÔLE DU LOADER
+      ==================================================================== -->
+
+    <script>
+      /**
+       * NexusDL - Gestionnaire du loader initial
+       * Ce script gère l'affichage et la disparition du loader.
+       * Il est exécuté avant le chargement du bundle principal.
+       */
+
+      (function() {
+        'use strict';
+
+        // Référence vers l'élément loader
+        var loader = document.getElementById('nexus-loader');
+
+        /**
+         * Masque le loader avec une transition fluide
+         * @param {boolean} remove - Supprime complètement l'élément après la transition
+         */
+        function hideLoader(remove) {
+          remove = remove !== undefined ? remove : true;
+          if (!loader) return;
+
+          // Ajouter la classe 'hide' pour déclencher la transition
+          loader.classList.add('hide');
+
+          // Après la transition, supprimer l'élément du DOM
+          if (remove) {
+            setTimeout(function() {
+              if (loader && loader.parentNode) {
+                loader.parentNode.removeChild(loader);
+              }
+            }, 700);
+          }
+        }
+
+        /**
+         * Met à jour la progression du loader
+         * @param {number} percent - Pourcentage de progression (0-100)
+         */
+        function updateLoaderProgress(percent) {
+          var bar = document.querySelector('.nexus-loader__progress-bar');
+          if (bar) {
+            var clamped = Math.min(100, Math.max(0, percent));
+            bar.style.width = clamped + '%';
+          }
+        }
+
+        /**
+         * Met à jour le texte du loader
+         * @param {string} text - Nouveau texte à afficher
+         */
+        function updateLoaderText(text) {
+          var subEl = document.querySelector('.nexus-loader__sub');
+          if (subEl) {
+            subEl.textContent = text || '';
+          }
+        }
+
+        // Exposer les fonctions au scope global pour que main.js puisse les appeler
+        window.__nexusLoader = {
+          hide: hideLoader,
+          progress: updateLoaderProgress,
+          setText: updateLoaderText,
+        };
+
+        // Si le module principal n'arrive pas à masquer le loader (cas d'erreur),
+        // on le masque après un délai de sécurité (8s)
+        var fallbackTimeout = setTimeout(function() {
+          hideLoader(true);
+        }, 8000);
+
+        // Annuler le timeout si la page est complètement chargée avant
+        window.addEventListener('load', function() {
+          clearTimeout(fallbackTimeout);
+          // Le loader sera masqué par main.js après le montage de l'app
+          // Mais on le masque après 3s supplémentaires si main.js ne l'a pas fait
+          setTimeout(function() {
+            if (loader && !loader.classList.contains('hide')) {
+              hideLoader(true);
+            }
+          }, 3000);
+        });
+
+        // Gestion des erreurs critiques : masquer le loader en cas d'erreur JS
+        window.addEventListener('error', function() {
+          hideLoader(true);
+        });
+
+        console.log('🧬 NexusDL Loader initialisé');
+      })();
+    </script>
+
+    <!-- ====================================================================
+      SECTION 10 - LISTE COMPLÈTE DES 50+ SITES SUPPORTÉS
+      (Documentation intégrée pour référence)
+      ==================================================================== -->
+
+    <!--
+    ═══════════════════════════════════════════════════════════════════════════
+      NEXUSDL 2.0 — SITES DE SCAN COMPATIBLES (50+)
+      ═══════════════════════════════════════════════════════════════════════════
+
+      🧬 LÉGENDE :
+      • 🟢 = Support natif (thème Madara)
+      • 🔵 = Support API (MangaDex)
+      • 🔴 = Support Playwright (JS lourd / Cloudflare)
+      • 🔞 = Contenu pour adultes (NSFW)
+
+      ═══════════════════════════════════════════════════════════════════════════
+
+      🇫🇷 SITES FRANÇAIS (26) — Thème Madara 🟢
+      ──────────────────────────────────────────────────────────────────────────
+      1.  sushiscan.net        - SushiScan (manga, manhwa, webtoon)
+      2.  scan-manga.com       - Scan-Manga (manga, manhwa)
+      3.  toonfr.com           - ToonFR (manga, webtoon)
+      4.  anime-scans.com      - Anime-Scans (manga, anime)
+      5.  ortegascans.com      - Ortega Scans (manga, manhwa)
+      6.  crunchyscan.fr       - CrunchyScan (manga, webtoon)
+      7.  mangas-origines.fr   - Mangas Origines (manga)
+      8.  toongod.org          - ToonGod (webtoon, manhwa)
+      9.  phenix-scans.co      - Phénix Scans (manga, manhwa)
+      10. poseidon-scans.net   - Poséidon Scans (manga)
+      11. raijin-scans.fr      - Raijin Scans (manga, manhwa)
+      12. rimuscan.fr          - Riu Scan (manga, webtoon)
+      13. blossom-scans.com    - Blossom Scans (manga, manhwa)
+      14. x-manga.net          - X-Manga (manga, hentai) 🔞
+      15. x-manga.org          - X-Manga (manga, hentai) 🔞
+      16. manhwaclub.net       - Manhwa Club (manhwa, webtoon)
+      17. epsilonscan.to       - Epsilon Scan (manga, manhwa)
+      18. manhwa-raw.com       - Manhwa Raw (manhwa, webtoon) 🔞
+      19. genkan-scans.com     - Genkan Scans (manga, manhwa)
+      20. nekohouse.fr         - NekoHouse (manga, webtoon)
+      21. shinra-scans.fr      - Shinra Scans (manga, manhwa)
+      22. taisei-scans.com     - Taisei Scans (manga, webtoon)
+      23. fandub-scans.com     - Fandub Scans (manga, manhwa)
+      24. karma-scans.com      - Karma Scans (manga, webtoon)
+      25. urano-scans.fr       - Urano Scans (manga, manhwa)
+      26. xanadu-scans.fr      - Xanadu Scans (manga, webtoon)
+
+      🌍 SITES INTERNATIONAUX (16) — Thème Madara 🟢
+      ──────────────────────────────────────────────────────────────────────────
+      27. mangakakalot.com     - MangaKakalot (manga, manhwa)
+      28. bato.to              - Batoto (manga, manhwa, webtoon)
+      29. comick.io            - Comick (manga, manhwa, webtoon)
+      30. asurascans.com       - Asura Scans (manhwa, webtoon)
+      31. flamescans.org       - Flame Scans (manhwa, webtoon)
+      32. reaperscans.com      - Reaper Scans (manhwa, webtoon)
+      33. luminousscans.com    - Luminous Scans (manhwa, webtoon)
+      34. void-scans.com       - Void Scans (manhwa, webtoon)
+      35. tcbscans.com         - TCB Scans (manga, webtoon)
+      36. mangasee123.com      - MangaSee (manga)
+      37. galaxy-scans.com     - Galaxy Scans (manhwa, webtoon)
+      38. zenith-scans.com     - Zenith Scans (manhwa, webtoon)
+      39. leviathanscans.com   - Leviathan Scans (manhwa, webtoon)
+      40. disasterscans.com    - Disaster Scans (manhwa, webtoon)
+      41. kireicake.com        - Kirei Cake (manga, manhwa)
+      42. scyllascans.com      - Scylla Scans (manhwa, webtoon)
+
+      🧬 SITES SPÉCIAUX (API / JS / Playwright)
+      ──────────────────────────────────────────────────────────────────────────
+      43. api.mangadex.org     - MangaDex (API REST officielle) 🔵
+      44. hentaizone.xyz       - Hentaizone (Playwright, JS) 🔴🔞
+      45. nhentai.net          - nHentai (API officieuse) 🔵🔞
+      46. pururin.com          - Pururin (Madara + Playwright) 🟢🔴🔞
+
+      ──────────────────────────────────────────────────────────────────────────
+      TOTAL : 46 sites (la liste complète de 50+ sera étendue dans les versions futures)
+      ═══════════════════════════════════════════════════════════════════════════
+    -->
+
+  </head>
+
+  <!-- ====================================================================
+    SECTION 11 - CORPS DE LA PAGE
+    ==================================================================== -->
+
+  <body>
+    <!-- ====================================================================
+      LOADER INITIAL (affiché avant le JS)
+    ==================================================================== -->
+
+    <div id="nexus-loader" class="nexus-loader" aria-hidden="true">
+      <div class="nexus-loader__spinner" role="status" aria-label="Chargement en cours"></div>
+      <div class="nexus-loader__brand">
+        <span class="nexus-loader__brand-icon">🧬</span>
+        <span>NexusDL</span>
+      </div>
+      <div class="nexus-loader__version">v2.0.0</div>
+      <div class="nexus-loader__sub">Chargement de l'application...</div>
+      <div class="nexus-loader__progress" aria-hidden="true">
+        <div class="nexus-loader__progress-bar" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+      POINT DE MONTAGE DE L'APPLICATION VUE.JS 3
+    ==================================================================== -->
+
+    <div id="app"></div>
+
+    <!-- ====================================================================
+      SECTION 12 - SCRIPT PRINCIPAL (entry point)
+      ==================================================================== -->
+
+    <script type="module" src="/src/main.js"></script>
+
+    <!-- ====================================================================
+      SECTION 13 - FALLBACK : si le module ne se charge pas
+    ==================================================================== -->
+
+    <noscript>
+      <style>
+        .nexus-loader {
+          display: none !important;
+        }
+        .noscript-warning {
+          display: flex !important;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 2rem;
+          text-align: center;
+          background: #0a0e1a;
+          color: #e8edf5;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .noscript-warning h1 {
+          font-size: 2rem;
+          margin-bottom: 0.5rem;
+          background: linear-gradient(135deg, #00d4ff, #0066ff);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .noscript-warning p {
+          color: #b0c0d8;
+          font-size: 1.1rem;
+          max-width: 500px;
+          -webkit-text-fill-color: #b0c0d8;
+        }
+      </style>
+      <div class="noscript-warning">
+        <h1>🧬 NexusDL</h1>
+        <p>
+          JavaScript est désactivé dans votre navigateur.<br />
+          Veuillez l'activer pour utiliser l'application.
+        </p>
+      </div>
+    </noscript>
+
+    <!-- ====================================================================
+      SECTION 14 - ANALYTICS / MONITORING (optionnel)
+      ==================================================================== -->
+    <!--
+    <script defer src="https://umami.example.com/script.js" data-website-id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></script>
+    <script defer src="https://stats.example.com/script.js" data-site-id="xxxxxxxx"></script>
+    -->
+
+    <!-- ====================================================================
+      SECTION 15 - SERVICE WORKER (PWA) - géré par Vite PWA
+      ==================================================================== -->
+    <!-- Le service worker est généré automatiquement par Vite PWA -->
+    <!--
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('✅ Service Worker enregistré');
+          }).catch(function(err) {
+            console.warn('⚠️ Échec SW:', err);
+          });
+        });
+      }
+    </script>
+    -->
+
+    <!-- ====================================================================
+      SECTION 16 - BOUTON DE MISE À JOUR (optionnel, pour PWA)
+      ==================================================================== -->
+    <!--
+    <div id="pwa-update" style="display:none;position:fixed;bottom:80px;right:20px;z-index:9999;background:#1a2538;border:1px solid #00d4ff;border-radius:12px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+      <p style="margin:0 0 8px;font-size:0.85rem;color:#e8edf5;">Une nouvelle version est disponible !</p>
+      <button onclick="location.reload()" style="background:#00d4ff;border:none;border-radius:6px;padding:6px 16px;font-weight:600;cursor:pointer;">🔄 Mettre à jour</button>
+    </div>
+    -->
+
+  </body>
+</html>
