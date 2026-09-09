@@ -1,0 +1,247 @@
+-- ==========================================================================
+--  NexusDL 2.0 - Base de données SQLite
+--  Fichier : data/nexus.db
+--  Version : 2.0.0
+--  Description : Schéma complet de la base de données NexusDL
+-- ==========================================================================
+
+-- --------------------------------------------------------------------------
+--  Table : users
+--  Description : Utilisateurs de l'application
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    hashed_password VARCHAR(200) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    full_name VARCHAR(100),
+    avatar_url VARCHAR(200),
+    preferences TEXT,  -- JSON string
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME
+);
+
+-- --------------------------------------------------------------------------
+--  Table : sessions
+--  Description : Sessions utilisateur (refresh tokens)
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    refresh_token VARCHAR(500) NOT NULL UNIQUE,
+    user_agent VARCHAR(200),
+    ip_address VARCHAR(45),
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_revoked BOOLEAN NOT NULL DEFAULT 0,
+    revoked_at DATETIME,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- --------------------------------------------------------------------------
+--  Table : settings
+--  Description : Paramètres globaux de l'application
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key VARCHAR(100) NOT NULL UNIQUE,
+    value TEXT,
+    type VARCHAR(20) NOT NULL DEFAULT 'string',
+    description VARCHAR(200),
+    category VARCHAR(50) NOT NULL DEFAULT 'general',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- --------------------------------------------------------------------------
+--  Table : providers
+--  Description : Providers de sites de scan
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS providers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    base_url VARCHAR(200) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT 1,
+    nsfw BOOLEAN NOT NULL DEFAULT 0,
+    languages JSON DEFAULT '[]',
+    version VARCHAR(20) DEFAULT '1.0.0',
+    description TEXT,
+    config JSON,
+    priority INTEGER DEFAULT 0,
+    last_used DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- --------------------------------------------------------------------------
+--  Table : library_items
+--  Description : Bibliothèque de fichiers CBZ
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS library_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR(200) NOT NULL,
+    filename VARCHAR(200) NOT NULL UNIQUE,
+    file_path VARCHAR(500) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_read DATETIME,
+    read_count INTEGER NOT NULL DEFAULT 0,
+    is_favorite BOOLEAN NOT NULL DEFAULT 0,
+    rating INTEGER NOT NULL DEFAULT 0,
+    metadata JSON,
+    tags JSON DEFAULT '[]',
+    cover_path VARCHAR(500)
+);
+
+-- --------------------------------------------------------------------------
+--  Table : jobs
+--  Description : Jobs de téléchargement
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id VARCHAR(50) NOT NULL UNIQUE,
+    type VARCHAR(20) NOT NULL DEFAULT 'download',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+    title VARCHAR(200) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    provider_id VARCHAR(50) NOT NULL,
+    total_chapters INTEGER NOT NULL DEFAULT 0,
+    done_chapters INTEGER NOT NULL DEFAULT 0,
+    total_pages INTEGER NOT NULL DEFAULT 0,
+    done_pages INTEGER NOT NULL DEFAULT 0,
+    progress FLOAT NOT NULL DEFAULT 0.0,
+    current_chapter VARCHAR(100),
+    current_chapter_id VARCHAR(100),
+    data JSON,
+    logs JSON DEFAULT '[]',
+    errors JSON DEFAULT '[]',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    completed_at DATETIME,
+    cancelled_at DATETIME,
+    user_id INTEGER,
+    result_path VARCHAR(500),
+    result_size INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+-- --------------------------------------------------------------------------
+--  Index pour optimiser les performances
+-- --------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions (refresh_token);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_is_revoked ON sessions (is_revoked);
+
+CREATE INDEX IF NOT EXISTS idx_settings_key ON settings (key);
+CREATE INDEX IF NOT EXISTS idx_settings_category ON settings (category);
+
+CREATE INDEX IF NOT EXISTS idx_providers_provider_id ON providers (provider_id);
+CREATE INDEX IF NOT EXISTS idx_providers_enabled ON providers (enabled);
+CREATE INDEX IF NOT EXISTS idx_providers_nsfw ON providers (nsfw);
+
+CREATE INDEX IF NOT EXISTS idx_library_items_title ON library_items (title);
+CREATE INDEX IF NOT EXISTS idx_library_items_filename ON library_items (filename);
+CREATE INDEX IF NOT EXISTS idx_library_items_is_favorite ON library_items (is_favorite);
+CREATE INDEX IF NOT EXISTS idx_library_items_rating ON library_items (rating);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_job_id ON jobs (job_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status);
+CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs (priority);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs (created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs (user_id);
+
+-- --------------------------------------------------------------------------
+--  Données initiales
+-- --------------------------------------------------------------------------
+
+-- 1. Utilisateur admin par défaut (mot de passe: admin123)
+INSERT OR IGNORE INTO users (
+    username, email, hashed_password, role, status, full_name, created_at, updated_at
+) VALUES (
+    'admin',
+    'admin@nexusdl.local',
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyXZf2qZz9bNfS',  -- admin123
+    'admin',
+    'active',
+    'Administrateur NexusDL',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- 2. Utilisateur test (mot de passe: test123)
+INSERT OR IGNORE INTO users (
+    username, email, hashed_password, role, status, full_name, created_at, updated_at
+) VALUES (
+    'test',
+    'test@nexusdl.local',
+    '$2b$12$Qv5x8yBqWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyXZf2qZz9bNfT',  -- test123
+    'user',
+    'active',
+    'Utilisateur Test',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- 3. Providers (seront mis à jour par l'application)
+INSERT OR IGNORE INTO settings (key, value, type, description, category) VALUES
+    ('max_download_threads', '10', 'int', 'Nombre maximum de téléchargements parallèles', 'downloads'),
+    ('enable_nsfw', 'false', 'bool', 'Activer le contenu pour adultes', 'content'),
+    ('default_language', 'fr', 'string', 'Langue par défaut pour les recherches', 'content'),
+    ('cache_enabled', 'true', 'bool', 'Activer le cache', 'performance'),
+    ('auto_cleanup_days', '30', 'int', 'Nettoyage automatique des jobs terminés (jours)', 'maintenance');
+
+-- --------------------------------------------------------------------------
+--  Trigger pour mettre à jour automatiquement updated_at
+-- --------------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS update_users_updated_at 
+    AFTER UPDATE ON users
+    BEGIN
+        UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_settings_updated_at 
+    AFTER UPDATE ON settings
+    BEGIN
+        UPDATE settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_providers_updated_at 
+    AFTER UPDATE ON providers
+    BEGIN
+        UPDATE providers SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_library_items_updated_at 
+    AFTER UPDATE ON library_items
+    BEGIN
+        UPDATE library_items SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_jobs_updated_at 
+    AFTER UPDATE ON jobs
+    BEGIN
+        UPDATE jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_sessions_updated_at 
+    AFTER UPDATE ON sessions
+    BEGIN
+        UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+-- --------------------------------------------------------------------------
+--  Fin du script
+-- --------------------------------------------------------------------------
