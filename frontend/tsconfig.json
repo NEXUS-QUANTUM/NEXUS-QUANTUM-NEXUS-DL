@@ -1,0 +1,117 @@
+{
+  "compilerOptions": {
+    // ======================================================================
+    //  Options de langage et d'environnement
+    // ======================================================================
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    // ======================================================================
+    //  Résolution des modules
+    // ======================================================================
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+
+    // ======================================================================
+    //  Contrôle de la qualité du code
+    // ======================================================================
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": false,
+    "allowUnreachableCode": false,
+
+    // ======================================================================
+    //  Alias de chemins
+    // ======================================================================
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@common/*": ["./src/components/common/*"],
+      "@stores/*": ["./src/stores/*"],
+      "@composables/*": ["./src/composables/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@directives/*": ["./src/directives/*"],
+      "@router/*": ["./src/router/*"],
+      "@types/*": ["./src/types/*"]
+    },
+
+    // ======================================================================
+    //  Types globaux
+    // ======================================================================
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "node"
+    ],
+
+    // ======================================================================
+    //  Autres options
+    // ======================================================================
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "importsNotUsedAsValues": "remove"
+  },
+
+  // ==========================================================================
+  //  Fichiers inclus
+  // ==========================================================================
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "tests/**/*.ts",
+    "tests/**/*.vue",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+
+  // ==========================================================================
+  //  Fichiers exclus
+  // ==========================================================================
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "*.config.js",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ],
+
+  // ==========================================================================
+  //  Options spécifiques à Vue (vue-tsc)
+  // ==========================================================================
+  "vueCompilerOptions": {
+    "experimentalDisableTemplateSupport": false,
+    "target": 3,
+    "strictTemplates": true,
+    "strictProps": true,
+    "strictCustomEvents": true,
+    "strictSlots": true
+  },
+
+  // ==========================================================================
+  //  Références (pour les fichiers de configuration)
+  // ==========================================================================
+  "references": [
+    { "path": "./tsconfig.node.json" }
+  ]
+}
