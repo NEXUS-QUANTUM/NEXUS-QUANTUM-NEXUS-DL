@@ -1,0 +1,82 @@
+# ==========================================================================
+#  NexusDL 2.0 - Backend Requirements
+#  Fichier : backend/requirements.txt
+#  Description : Dépendances Python pour le backend FastAPI
+#  Version : 2.0.0
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+#  Framework Web & Serveur
+# --------------------------------------------------------------------------
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+
+# --------------------------------------------------------------------------
+#  HTTP Client & Asynchrone
+# --------------------------------------------------------------------------
+aiohttp==3.9.3
+aiofiles==23.2.1
+aiojobs==1.1.0          # Pour la gestion des tâches asynchrones
+
+# --------------------------------------------------------------------------
+#  Scraping & Parsing
+# --------------------------------------------------------------------------
+beautifulsoup4==4.12.3
+lxml==5.1.0
+playwright==1.41.1
+html5lib==1.1           # Alternative de parsing (optionnel)
+
+# --------------------------------------------------------------------------
+#  Base de données & ORM
+# --------------------------------------------------------------------------
+sqlalchemy==2.0.27
+alembic==1.13.1          # Pour les migrations (optionnel)
+# Pour PostgreSQL (optionnel) - commenté car on utilise SQLite par défaut
+# psycopg2-binary==2.9.9
+# Pour MySQL (optionnel)
+# pymysql==1.1.0
+
+# --------------------------------------------------------------------------
+#  Sécurité & Authentification
+# --------------------------------------------------------------------------
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.1
+
+# --------------------------------------------------------------------------
+#  Validation & Sérialisation
+# --------------------------------------------------------------------------
+pydantic==2.5.3
+pydantic-settings==2.1.0
+email-validator==2.1.1   # Pour la validation des emails
+
+# --------------------------------------------------------------------------
+#  Traitement d'images & Génération CBZ
+# --------------------------------------------------------------------------
+pillow==10.2.0
+
+# --------------------------------------------------------------------------
+#  Monitoring & Utilitaires système
+# --------------------------------------------------------------------------
+psutil==5.9.8
+
+# --------------------------------------------------------------------------
+#  Dépendances optionnelles pour le développement
+# --------------------------------------------------------------------------
+# pytest==8.0.0
+# pytest-asyncio==0.23.4
+# pytest-cov==4.1.0
+# black==24.2.0
+# flake8==7.0.0
+# mypy==1.8.0
+# httpx==0.27.0
+# requests==2.31.0
+
+# --------------------------------------------------------------------------
+#  Notes
+# --------------------------------------------------------------------------
+# - Toutes les versions sont verrouillées pour la reproductibilité.
+# - Playwright nécessite l'installation des navigateurs (voir Dockerfile).
+# - Pour PostgreSQL, décommenter psycopg2-binary et modifier DATABASE_URL.
+# - Pour MySQL, décommenter pymysql.
