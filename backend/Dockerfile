@@ -1,65 +1,156 @@
 # ==========================================================================
-#  NexusDL 2.0 - Backend Dockerfile (pour Render)
+#  NexusDL 2.0 - Backend Dockerfile
 #  Fichier : backend/Dockerfile
-#  Description : Version optimisée pour Render avec contexte racine
+#  Description : Image Docker pour le backend FastAPI de NexusDL
+#  Architecture : Multi-stage (builder + production)
+#  Version : 2.0.0
 # ==========================================================================
+
+# --------------------------------------------------------------------------
+#  STAGE 1 : BUILDER - Installation des dépendances Python
+# --------------------------------------------------------------------------
 
 FROM python:3.10-slim AS builder
 
+# --- Configuration de l'environnement ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    DEBIAN_FRONTEND=noninteractive
 
+# --- Arguments de build ---
+ARG BUILD_DATE=2025-01-15T00:00:00Z
+ARG VERSION=2.0.0
+ARG GIT_COMMIT=unknown
+
+# --- Métadonnées de l'image (builder) ---
+LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
+      org.opencontainers.image.title="NexusDL Backend (Builder)" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.build-date="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.description="NexusDL 2.0 - Backend FastAPI (builder stage)" \
+      org.opencontainers.image.licenses="GPL-3.0-only"
+
+# --- Installation des dépendances système nécessaires ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget gnupg ca-certificates unzip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    curl \
+    wget \
+    gnupg \
+    ca-certificates \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/archives/*
 
+# --- Copier le fichier requirements et installer les dépendances Python ---
 WORKDIR /build
+COPY requirements.txt .
 
-# ✅ CORRECTION : Copier depuis le sous-dossier backend/
-COPY backend/requirements.txt .
+# Installer les dépendances dans un dossier dédié (/install)
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
+# --------------------------------------------------------------------------
+#  STAGE 2 : PLAYWRIGHT - Installation du navigateur Chromium
+# --------------------------------------------------------------------------
+
 FROM builder AS playwright-installer
+
+# Installer Playwright et Chromium (séparément pour optimiser le cache)
 RUN pip install --no-cache-dir --prefix=/install playwright==1.41.1 \
     && /install/bin/playwright install chromium \
     && /install/bin/playwright install-deps
 
+# --------------------------------------------------------------------------
+#  STAGE 3 : PRODUCTION - Image finale légère
+# --------------------------------------------------------------------------
+
 FROM python:3.10-slim AS production
 
+# --- Configuration de l'environnement ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    TZ=Europe/Paris \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PYTHONMALLOC=debug
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgbm1 \
-    libpango-1.0-0 libcairo2 libatspi2.0-0 libx11-6 libxcomposite1 \
-    libxdamage1 libxext6 libxfixes3 libxrandr2 libasound2 curl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# --- Variables d'environnement par défaut ---
+ENV ENV=production \
+    HOST=0.0.0.0 \
+    PORT=8000
 
+# --- Arguments de build ---
+ARG BUILD_DATE=2025-01-15T00:00:00Z
+ARG VERSION=2.0.0
+ARG GIT_COMMIT=unknown
+
+# --- Métadonnées de l'image finale ---
+LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
+      org.opencontainers.image.title="NexusDL Backend" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.build-date="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.description="NexusDL 2.0 - Backend FastAPI (production)" \
+      org.opencontainers.image.licenses="GPL-3.0-only"
+
+# --- Création d'un utilisateur non-root ---
 RUN groupadd -r nexusdl && useradd -r -g nexusdl nexusdl \
     && mkdir -p /app/data/downloads /app/data/cache /app/data/temp /app/logs \
     && chown -R nexusdl:nexusdl /app
 
+# --- Installation des dépendances système minimales pour le runtime ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Dépendances pour Playwright (runtime)
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
+    libx11-6 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libasound2 \
+    # Utilitaires
+    curl \
+    # Nettoyage
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/archives/*
+
+# --- Copier les dépendances Python depuis le builder ---
 COPY --from=playwright-installer /install /usr/local
 COPY --from=playwright-installer /root/.cache/ms-playwright /ms-playwright
 
+# --- Copier le code source de l'application ---
 WORKDIR /app
-
-# ✅ CORRECTION : Copier depuis le sous-dossier backend/
-COPY backend/app ./app
+COPY ./app ./app
 COPY .env .env
 
+# --- Ajuster les permissions pour l'utilisateur non-root ---
 RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
     && chmod +x /usr/local/bin/playwright
 
+# --- Utilisateur non-root pour la sécurité ---
 USER nexusdl
 
+# --- Exposer le port ---
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=5 \
+# --- Healthcheck pour vérifier l'état du service ---
+HEALTHCHECK --interval=30s \
+            --timeout=10s \
+            --start-period=45s \
+            --retries=5 \
     CMD curl -f http://localhost:8000/health || exit 1
 
+# --- Point d'entrée de l'application ---
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
