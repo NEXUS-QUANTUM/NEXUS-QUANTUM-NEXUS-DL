@@ -1,0 +1,401 @@
+// ==========================================================================
+//  NexusDL 2.0 - Nexus Theme
+//  Fichier : frontend/src/assets/styles/nexus-theme.scss
+//  Description : Variables, thèmes (sombre/clair) et mixins pour l'application
+//  Version : 2.0.0
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+//  1. VARIABLES DU THÈME (DEFAULTS - Dark mode)
+// --------------------------------------------------------------------------
+
+:root {
+  // --- Couleurs principales ---
+  --color-primary: #00d4ff;
+  --color-primary-dark: #0099cc;
+  --color-primary-light: #66e5ff;
+  --color-secondary: #0066ff;
+  --color-secondary-dark: #0044cc;
+  --color-secondary-light: #3399ff;
+
+  // --- Couleurs d'état ---
+  --color-success: #4caf50;
+  --color-success-dark: #388e3c;
+  --color-warning: #ff9800;
+  --color-warning-dark: #f57c00;
+  --color-error: #f44336;
+  --color-error-dark: #c62828;
+  --color-info: #2196f3;
+  --color-info-dark: #1565c0;
+
+  // --- Fond et surface (dark) ---
+  --color-bg-primary: #0a0e1a;
+  --color-bg-secondary: #141a2b;
+  --color-bg-card: #1a2538;
+  --color-bg-input: #1e2a40;
+  --color-bg-hover: #253254;
+
+  // --- Texte (dark) ---
+  --color-text-primary: #e8edf5;
+  --color-text-secondary: #b0c0d8;
+  --color-text-muted: #6a7a9a;
+  --color-text-inverse: #0a0e1a;
+
+  // --- Bordures ---
+  --color-border: #1a2538;
+  --color-border-light: #253254;
+  --color-border-focus: #00d4ff;
+
+  // --- Ombres ---
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  // --- Typographie ---
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-size-base: 16px;
+  --font-size-sm: 0.875rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  // --- Rayons de bordure ---
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  // --- Transitions ---
+  --transition-fast: 150ms ease;
+  --transition-base: 300ms ease;
+  --transition-slow: 500ms ease;
+
+  // --- Espacement ---
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-12: 3rem;
+
+  // --- Hauteur de ligne ---
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.8;
+
+  // --- Largeurs max ---
+  --max-width-container: 1200px;
+  --max-width-content: 800px;
+
+  // --- Variables dérivées (pour compatibilité) ---
+  --accent-primary: var(--color-primary);
+  --accent-secondary: var(--color-secondary);
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-card: var(--color-bg-card);
+  --border-color: var(--color-border);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+}
+
+// --------------------------------------------------------------------------
+//  2. THEME LIGHT (surcharge les variables)
+// --------------------------------------------------------------------------
+
+.light-mode {
+  --color-bg-primary: #f4f6fa;
+  --color-bg-secondary: #e9ecf2;
+  --color-bg-card: #ffffff;
+  --color-bg-input: #f0f2f5;
+  --color-bg-hover: #e3e8ef;
+
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #3d4a5c;
+  --color-text-muted: #7a8a9a;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #d0d8e0;
+  --color-border-light: #e3e8ef;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+
+  // Couleurs principales adaptées pour meilleur contraste
+  --color-primary: #0066cc;
+  --color-primary-dark: #004d99;
+  --color-primary-light: #3399ff;
+  --color-secondary: #0044b3;
+  --color-secondary-dark: #003380;
+  --color-secondary-light: #3366cc;
+
+  // État
+  --color-success: #2e7d32;
+  --color-warning: #e65100;
+  --color-error: #c62828;
+  --color-info: #0d47a1;
+
+  // Redéfinir les alias
+  --accent-primary: var(--color-primary);
+  --accent-secondary: var(--color-secondary);
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-card: var(--color-bg-card);
+  --border-color: var(--color-border);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+}
+
+// --------------------------------------------------------------------------
+//  3. UTILITAIRES (classes de thème)
+// --------------------------------------------------------------------------
+
+// Appliquer le thème sur le body
+.dark-mode {
+  @extend :root;
+}
+
+// Classes pour les couleurs de texte
+.text-theme-primary {
+  color: var(--color-text-primary);
+}
+.text-theme-secondary {
+  color: var(--color-text-secondary);
+}
+.text-theme-muted {
+  color: var(--color-text-muted);
+}
+.text-theme-accent {
+  color: var(--color-primary);
+}
+
+// Classes pour les arrière-plans
+.bg-theme-primary {
+  background-color: var(--color-bg-primary);
+}
+.bg-theme-secondary {
+  background-color: var(--color-bg-secondary);
+}
+.bg-theme-card {
+  background-color: var(--color-bg-card);
+}
+.bg-theme-accent {
+  background-color: var(--color-primary);
+}
+.bg-theme-accent-light {
+  background-color: var(--color-primary-light);
+}
+
+// Classes pour les bordures
+.border-theme {
+  border-color: var(--color-border);
+}
+.border-theme-light {
+  border-color: var(--color-border-light);
+}
+.border-theme-accent {
+  border-color: var(--color-primary);
+}
+
+// --------------------------------------------------------------------------
+//  4. MIXINS SCSS (pour utilisation dans les composants)
+// --------------------------------------------------------------------------
+
+// Mixin pour les transitions de thème
+@mixin theme-transition($properties: all) {
+  transition: $properties var(--transition-base);
+}
+
+// Mixin pour les ombres
+@mixin shadow($level: md) {
+  @if $level == sm {
+    box-shadow: var(--shadow-sm);
+  } @else if $level == md {
+    box-shadow: var(--shadow-md);
+  } @else if $level == lg {
+    box-shadow: var(--shadow-lg);
+  } @else if $level == xl {
+    box-shadow: var(--shadow-xl);
+  } @else {
+    box-shadow: var(--shadow-md);
+  }
+}
+
+// Mixin pour les bordures
+@mixin border($width: 1px, $style: solid, $color: var(--color-border)) {
+  border: $width $style $color;
+}
+
+// Mixin pour le focus
+@mixin focus-ring($color: var(--color-primary), $width: 2px) {
+  &:focus-visible {
+    outline: $width solid $color;
+    outline-offset: 2px;
+  }
+}
+
+// Mixin pour le texte avec ellipsis
+@mixin text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Mixin pour les cards
+@mixin card($padding: var(--spacing-4)) {
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  @include border(1px, solid, var(--color-border));
+  padding: $padding;
+  @include shadow(md);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  &:hover {
+    border-color: var(--color-primary);
+    @include shadow(lg);
+  }
+}
+
+// Mixin pour les boutons
+@mixin button-variant($bg: var(--color-primary), $text: var(--color-text-inverse)) {
+  background-color: $bg;
+  color: $text;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1.25rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  &:hover {
+    background-color: darken($bg, 10%);
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  @include focus-ring();
+}
+
+// Mixin pour les inputs
+@mixin input-theme() {
+  background-color: var(--color-bg-input);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem;
+  font-size: var(--font-size-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb, 0, 212, 255), 0.15);
+  }
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+}
+
+// Mixin pour les scrollbars
+@mixin custom-scrollbar($width: 8px, $thumb: var(--color-primary), $track: var(--color-bg-secondary)) {
+  &::-webkit-scrollbar {
+    width: $width;
+    height: $width;
+  }
+  &::-webkit-scrollbar-track {
+    background: $track;
+    border-radius: $width / 2;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: $thumb;
+    border-radius: $width / 2;
+    &:hover {
+      background: darken($thumb, 10%);
+    }
+  }
+  // Firefox
+  scrollbar-width: thin;
+  scrollbar-color: $thumb $track;
+}
+
+// --------------------------------------------------------------------------
+//  5. THÈME DYNAMIQUE (pour les composants)
+// --------------------------------------------------------------------------
+
+// Variables CSS utilisables dans les composants
+:export {
+  // Couleurs
+  colorPrimary: var(--color-primary);
+  colorSecondary: var(--color-secondary);
+  colorSuccess: var(--color-success);
+  colorWarning: var(--color-warning);
+  colorError: var(--color-error);
+  colorInfo: var(--color-info);
+  // Fond
+  bgPrimary: var(--color-bg-primary);
+  bgSecondary: var(--color-bg-secondary);
+  bgCard: var(--color-bg-card);
+  // Texte
+  textPrimary: var(--color-text-primary);
+  textSecondary: var(--color-text-secondary);
+  textMuted: var(--color-text-muted);
+  // Bordures
+  border: var(--color-border);
+  // Ombres
+  shadowSm: var(--shadow-sm);
+  shadowMd: var(--shadow-md);
+  shadowLg: var(--shadow-lg);
+  // Radius
+  radiusSm: var(--radius-sm);
+  radiusMd: var(--radius-md);
+  radiusLg: var(--radius-lg);
+  radiusXl: var(--radius-xl);
+  // Transitions
+  transitionBase: var(--transition-base);
+  transitionFast: var(--transition-fast);
+}
+
+// --------------------------------------------------------------------------
+//  6. TOKENS DE DESIGN (pour référence)
+// --------------------------------------------------------------------------
+
+// Ces tokens sont disponibles pour être utilisés dans les fichiers SCSS
+$color-primary: var(--color-primary);
+$color-secondary: var(--color-secondary);
+$color-success: var(--color-success);
+$color-warning: var(--color-warning);
+$color-error: var(--color-error);
+$color-info: var(--color-info);
+$bg-primary: var(--color-bg-primary);
+$bg-secondary: var(--color-bg-secondary);
+$bg-card: var(--color-bg-card);
+$text-primary: var(--color-text-primary);
+$text-secondary: var(--color-text-secondary);
+$text-muted: var(--color-text-muted);
+$border-color: var(--color-border);
+$shadow-sm: var(--shadow-sm);
+$shadow-md: var(--shadow-md);
+$shadow-lg: var(--shadow-lg);
+$shadow-xl: var(--shadow-xl);
+$radius-sm: var(--radius-sm);
+$radius-md: var(--radius-md);
+$radius-lg: var(--radius-lg);
+$radius-xl: var(--radius-xl);
+$transition-base: var(--transition-base);
+$transition-fast: var(--transition-fast);
+$font-family: var(--font-family);
+
+// ==========================================================================
+//  Fin de nexus-theme.scss
+// ==========================================================================
