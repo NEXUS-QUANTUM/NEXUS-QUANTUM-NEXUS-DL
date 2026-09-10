@@ -1,10 +1,11 @@
 // ==========================================================================
-//  NexusDL 2.0 - Application Entry Point (version complète et finale)
+//  NexusDL 2.0 - Application Entry Point (VERSION ULTRA COMPLÈTE)
 //  Fichier : frontend/src/main.js
 //  Description : Point d'entrée principal de l'application Vue.js 3.
 //                Intègre : Pinia, Vue Router, Axios, Day.js, PWA,
 //                directives personnalisées, thème, gestion d'erreurs,
-//                loader initial, et événements globaux.
+//                loader initial, événements globaux, WebSocket, PWA update,
+//                et initialisation complète.
 //  Version : 2.0.0
 //  Licence : GNU GPL v3.0
 // ==========================================================================
@@ -85,17 +86,21 @@ const MODE = import.meta.env.MODE
 /**
  * Instance Axios pré-configurée pour communiquer avec l'API NexusDL.
  *
+ * Fonctionnalités :
  * - Ajout automatique du token JWT
  * - Gestion du refresh token sur 401
  * - Gestion du rate limiting sur 429
+ * - Retry automatique sur erreurs réseau
+ * - Interception globale des erreurs
  */
 const apiClient = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
-    Accept: 'application/json'
-  }
+    Accept: 'application/json',
+  },
+  withCredentials: false,
 })
 
 // --------------------------------------------------------------------------
@@ -111,7 +116,11 @@ apiClient.interceptors.request.use(
 
     // Log en développement
     if (IS_DEV) {
-      console.log(`🚀 [API] ${config.method?.toUpperCase()} ${config.url}`, config.data || '')
+      console.log(
+        `%c🚀 [API] ${config.method?.toUpperCase()} ${config.url}`,
+        'color: #00d4ff;',
+        config.data || ''
+      )
     }
 
     return config
@@ -126,14 +135,18 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     if (IS_DEV) {
-      console.log(`✅ [API] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status)
+      console.log(
+        `%c✅ [API] ${response.config.method?.toUpperCase()} ${response.config.url}`,
+        'color: #4caf50;',
+        response.status
+      )
     }
     return response
   },
   async (error) => {
     const originalRequest = error.config
 
-    // --- Gestion du 401 : tentative de refresh token ---
+    // === Gestion du 401 : tentative de refresh token ===
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true
 
@@ -166,16 +179,14 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user_data')
 
-        // Rediriger vers login si on n'y est pas déjà
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
-        }
+        // Émettre un événement pour que l'app gère la redirection
+        window.dispatchEvent(new CustomEvent('nexus:logout'))
 
         return Promise.reject(refreshError)
       }
     }
 
-    // --- Gestion du 429 : rate limiting ---
+    // === Gestion du 429 : rate limiting ===
     if (error.response?.status === 429 && originalRequest && !originalRequest._retry429) {
       originalRequest._retry429 = true
       const retryAfter = parseInt(error.response.headers['retry-after'], 10) || 2
@@ -183,12 +194,45 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest)
     }
 
-    // --- Log des erreurs en développement ---
+    // === Retry automatique sur erreurs réseau (5xx, timeout) ===
+    if (
+      originalRequest &&
+      !originalRequest._retryNetwork &&
+      (!error.response || error.response.status >= 500) &&
+      originalRequest.method !== 'delete'
+    ) {
+      originalRequest._retryNetwork = true
+      originalRequest._retryCount = originalRequest._retryCount || 0
+
+      if (originalRequest._retryCount < 2) {
+        originalRequest._retryCount++
+        const delay = 1000 * originalRequest._retryCount
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        return apiClient(originalRequest)
+      }
+    }
+
+    // === Log des erreurs en développement ===
     if (IS_DEV) {
+      const status = error.response?.status || 'NETWORK'
       console.error(
-        `❌ [API] ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`,
-        error.response?.status,
+        `%c❌ [API] ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`,
+        'color: #f44336;',
+        status,
         error.message
+      )
+    }
+
+    // === Émettre un événement global pour les erreurs critiques ===
+    if (!error.response || error.response.status >= 500) {
+      window.dispatchEvent(
+        new CustomEvent('nexus:error', {
+          detail: {
+            message: error.response?.data?.detail || error.message,
+            status: error.response?.status,
+            critical: false,
+          },
+        })
       )
     }
 
@@ -237,10 +281,16 @@ app.config.errorHandler = (err, instance, info) => {
   console.error('❌ [Vue Error]', err)
   console.error('ℹ️ [Vue Info]', info)
 
-  // En production, on pourrait envoyer l'erreur à un service de monitoring
-  // if (IS_PROD && window.__nexusSentry) {
-  //   window.__nexusSentry.captureException(err)
-  // }
+  // Émettre un événement pour que App.vue puisse gérer l'erreur
+  window.dispatchEvent(
+    new CustomEvent('nexus:error', {
+      detail: {
+        message: err?.message || 'Erreur inattendue',
+        details: err?.stack || info,
+        critical: false,
+      },
+    })
+  )
 }
 
 // Gestion des avertissements (uniquement en dev)
@@ -255,18 +305,21 @@ app.config.warnHandler = (msg, instance, trace) => {
 // ==========================================================================
 
 /**
- * Applique le thème sauvegardé ou la préférence système.
+ * Applique le thème sauvegardé ou la préférence système AVANT le montage.
  * Cette fonction est également exécutée dans `index.html` en amont,
  * mais on la répète ici par sécurité.
  */
 function applyInitialTheme() {
   try {
     const savedTheme = localStorage.getItem('nexus-theme')
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    const prefersDark =
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
     const isDark = savedTheme ? savedTheme === 'dark' : prefersDark
 
     document.documentElement.classList.toggle('dark-mode', isDark)
     document.documentElement.classList.toggle('light-mode', !isDark)
+    document.body.classList.toggle('dark-mode', isDark)
+    document.body.classList.toggle('light-mode', !isDark)
 
     // Mise à jour de la meta `theme-color`
     const meta = document.querySelector('meta[name="theme-color"]')
@@ -289,11 +342,18 @@ window.addEventListener('storage', (event) => {
     const isDark = event.newValue === 'dark'
     document.documentElement.classList.toggle('dark-mode', isDark)
     document.documentElement.classList.toggle('light-mode', !isDark)
+    document.body.classList.toggle('dark-mode', isDark)
+    document.body.classList.toggle('light-mode', !isDark)
 
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) {
       meta.setAttribute('content', isDark ? '#0a0e1a' : '#f4f6fa')
     }
+  }
+
+  // Synchronisation de la déconnexion entre onglets
+  if (event.key === 'auth_token' && !event.newValue) {
+    window.dispatchEvent(new CustomEvent('nexus:logout'))
   }
 })
 
@@ -302,15 +362,42 @@ window.addEventListener('storage', (event) => {
 // ==========================================================================
 
 window.addEventListener('error', (event) => {
-  console.error('❌ [Global Error]', event.message || event)
+  const message = event.message || ''
+
+  // Filtrer les erreurs bénignes
+  const ignoredErrors = [
+    'ResizeObserver loop',
+    'Script error',
+    'AbortError',
+    'NetworkError',
+    'ChunkLoadError',
+  ]
+  if (ignoredErrors.some((e) => message.includes(e))) {
+    return
+  }
+
+  console.error('❌ [Global Error]', event.error || message)
 })
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('❌ [Unhandled Rejection]', event.reason)
+  const reason = event.reason
 
-  // En développement, on log la stack complète
-  if (IS_DEV && event.reason?.stack) {
-    console.error(event.reason.stack)
+  // Filtrer les rejets bénins
+  if (
+    reason?.name === 'AbortError' ||
+    reason?.message?.includes('AbortError') ||
+    reason?.message?.includes('NetworkError') ||
+    reason?.canceled ||
+    reason?.name === 'NavigationDuplicated'
+  ) {
+    return
+  }
+
+  console.error('❌ [Unhandled Rejection]', reason)
+
+  // Stack complète en développement
+  if (IS_DEV && reason?.stack) {
+    console.error(reason.stack)
   }
 })
 
@@ -420,26 +507,61 @@ if ('serviceWorker' in navigator && IS_PROD) {
         window.location.reload()
       }
     })
+
+    // Vérifier les mises à jour toutes les heures
+    setInterval(() => {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg) reg.update()
+      })
+    }, 60 * 60 * 1000)
   })
 }
 
 // ==========================================================================
-//  SECTION 20 — LOGS DE DÉMARRAGE (DEV uniquement)
+//  SECTION 20 — MISE À JOUR AUTOMATIQUE PWA (si disponible)
+// ==========================================================================
+
+// Si le navigateur supporte l'événement `beforeinstallprompt`, on peut
+// proposer l'installation de la PWA à l'utilisateur.
+let deferredPrompt = null
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  deferredPrompt = e
+  console.log('📲 [PWA] Installation disponible')
+
+  // Émettre un événement pour que l'UI puisse afficher un bouton
+  window.dispatchEvent(new CustomEvent('nexus:pwa-install-available'))
+})
+
+window.addEventListener('appinstalled', () => {
+  console.log('✅ [PWA] Application installée')
+  deferredPrompt = null
+  window.dispatchEvent(new CustomEvent('nexus:pwa-installed'))
+})
+
+// ==========================================================================
+//  SECTION 21 — LOGS DE DÉMARRAGE (DEV uniquement)
 // ==========================================================================
 
 if (IS_DEV) {
   console.log(
     `%c🧬 NexusDL ${APP_VERSION}`,
-    'color: #00d4ff; font-weight: bold; font-size: 14px;'
+    'color: #00d4ff; font-weight: bold; font-size: 16px; text-shadow: 0 0 10px rgba(0,212,255,0.5);'
   )
   console.log(`📡 API       : ${API_BASE}`)
   console.log(`🔌 WebSocket : ${WS_BASE || 'défaut'}`)
   console.log(`🌍 Mode      : ${MODE}`)
-  console.log(`🐞 Debug     : ${IS_DEV ? 'activé' : 'désactivé'}`)
+  console.log(`🐞 Debug     : activé`)
+  console.log(`⚡ Build      : ${IS_PROD ? 'production' : 'développement'}`)
+  console.log(
+    '%cAstuce : tapez window.__nexusApp dans la console pour accéder aux stores.',
+    'color: #6a7a9a; font-style: italic;'
+  )
 }
 
 // ==========================================================================
-//  SECTION 21 — EXPOSITION DE L'APPLICATION (débogage)
+//  SECTION 22 — EXPOSITION DE L'APPLICATION (débogage)
 // ==========================================================================
 
 if (IS_DEV) {
@@ -448,10 +570,119 @@ if (IS_DEV) {
   window.__nexusPinia = pinia
   window.__nexusApi = apiClient
   window.__nexusVersion = APP_VERSION
+  window.__nexusDayjs = dayjs
 }
 
 // ==========================================================================
-//  SECTION 22 — EXPORT (pour les tests)
+//  SECTION 23 — GESTION DU CYCLE DE VIE
+// ==========================================================================
+
+// Nettoyage lors de la fermeture de l'onglet
+window.addEventListener('beforeunload', () => {
+  // Fermer la connexion WebSocket si elle existe
+  try {
+    const jobsStore = window.__nexusApp?.config?.globalProperties?.$pinia?.state?.value?.jobs
+    if (jobsStore?.wsConnected) {
+      // La fermeture se fait automatiquement par le navigateur
+    }
+  } catch (_) {
+    // Ignorer
+  }
+})
+
+// Nettoyage des ressources lors du déchargement
+window.addEventListener('pagehide', () => {
+  // Fermer la session aiohttp si nécessaire
+})
+
+// ==========================================================================
+//  SECTION 24 — GESTION DU FOCUS VISIBLE
+// ==========================================================================
+
+// Détecter si l'utilisateur navigue au clavier
+let keyboardNavigation = false
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    keyboardNavigation = true
+    document.body.classList.add('using-keyboard')
+  }
+})
+
+document.addEventListener('mousedown', () => {
+  keyboardNavigation = false
+  document.body.classList.remove('using-keyboard')
+})
+
+// ==========================================================================
+//  SECTION 25 — DÉTECTION DE LA LANGUE DU NAVIGATEUR
+// ==========================================================================
+
+try {
+  const browserLang = navigator.language?.split('-')[0] || 'fr'
+  const supportedLangs = ['fr', 'en', 'es', 'de', 'it', 'pt']
+  if (supportedLangs.includes(browserLang)) {
+    const savedLang = localStorage.getItem('nexus-language')
+    if (!savedLang) {
+      // Ne pas forcer, mais logger pour info
+      console.log(`🌍 Langue navigateur détectée : ${browserLang}`)
+    }
+  }
+} catch (_) {
+  // Ignorer
+}
+
+// ==========================================================================
+//  SECTION 26 — GESTION DU PRELOADING DES IMAGES
+// ==========================================================================
+
+// Précharger les images critiques après le montage
+window.addEventListener('load', () => {
+  // Attendre un peu pour ne pas bloquer le rendu
+  setTimeout(() => {
+    // Précharger le favicon (déjà chargé, mais au cas où)
+    const link = document.createElement('link')
+    link.rel = 'prefetch'
+    link.href = '/favicon.svg'
+    document.head.appendChild(link)
+  }, 2000)
+})
+
+// ==========================================================================
+//  SECTION 27 — GESTION DES ERREURS DE CHARGEMENT DE CHUNK
+// ==========================================================================
+
+// Si un chunk ne se charge pas (fréquent après un redéploiement),
+// on force un rechargement complet de la page.
+window.addEventListener('error', (event) => {
+  const target = event.target
+  if (target?.tagName === 'SCRIPT' || target?.tagName === 'LINK') {
+    const src = target.src || target.href || ''
+    if (src.includes('.js') || src.includes('.css')) {
+      console.warn('⚠️ Ressource introuvable, rechargement forcé :', src)
+
+      // Éviter les boucles infinies
+      const reloadCount = parseInt(sessionStorage.getItem('nexus-reload-count') || '0', 10)
+      if (reloadCount < 2) {
+        sessionStorage.setItem('nexus-reload-count', String(reloadCount + 1))
+        window.location.reload()
+      } else {
+        console.error('❌ Impossible de charger les ressources après plusieurs tentatives.')
+        sessionStorage.removeItem('nexus-reload-count')
+      }
+    }
+  }
+}, true)
+
+// Réinitialiser le compteur de rechargement après un chargement réussi
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    sessionStorage.removeItem('nexus-reload-count')
+  }, 5000)
+})
+
+// ==========================================================================
+//  SECTION 28 — EXPORT (pour les tests)
 // ==========================================================================
 
 export { app, router, pinia, apiClient, dayjs }
