@@ -1,9 +1,8 @@
 # ==========================================================================
-#  NexusDL 2.0 - Backend Dockerfile (version ultra-complète)
+#  NexusDL 2.0 - Backend Dockerfile (version complète et corrigée)
 #  Fichier : backend/Dockerfile
 #  Description : Image Docker pour le backend FastAPI seul, prête pour Render
 #  Version : 2.0.0
-#  Architecture : Multi-stage avec optimisations pour production
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -12,7 +11,7 @@
 
 FROM python:3.10-slim AS builder
 
-# --- Configuration de l'environnement pour optimiser les builds ---
+# --- Configuration de l'environnement ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
