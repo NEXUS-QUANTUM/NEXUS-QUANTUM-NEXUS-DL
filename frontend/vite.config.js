@@ -1,7 +1,9 @@
 // ==========================================================================
-//  NexusDL 2.0 - Vite Configuration
+//  NexusDL 2.0 - Vite Configuration (version corrigée et complète)
 //  Fichier : frontend/vite.config.js
-//  Description : Configuration complète de Vite pour l'application Vue.js 3
+//  Description : Configuration Vite pour Vue.js 3, avec correction de
+//                l'import circulaire SCSS qui causait l'erreur de build.
+//  Version : 2.0.0
 // ==========================================================================
 
 import { defineConfig, loadEnv } from 'vite'
@@ -41,27 +43,29 @@ export default defineConfig(({ mode }) => {
         }
       }),
 
-      // Compression gzip
+      // Compression gzip (production uniquement)
       compression({
         algorithm: 'gzip',
         ext: '.gz',
         threshold: 1024,
-        deleteOriginalAssets: false
+        deleteOriginalAssets: false,
+        disable: !isProduction
       }),
 
-      // Compression brotli
+      // Compression brotli (production uniquement)
       compression({
         algorithm: 'brotliCompress',
         ext: '.br',
         threshold: 1024,
-        deleteOriginalAssets: false
+        deleteOriginalAssets: false,
+        disable: !isProduction
       }),
 
-      // PWA (Progressive Web App) - activé en production
+      // PWA (Progressive Web App)
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
-        manifest: false, // Utiliser le manifest.json existant
+        manifest: false, // Utiliser /public/manifest.json
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
@@ -73,11 +77,28 @@ export default defineConfig(({ mode }) => {
                 expiration: {
                   maxEntries: 10,
                   maxAgeSeconds: 60 * 60 * 24 * 365 // 1 an
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
                 }
               }
             },
             {
-              urlPattern: /^https:\/\/api\./i,
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /\/api\/.*/i,
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'api-cache',
@@ -85,14 +106,16 @@ export default defineConfig(({ mode }) => {
                 expiration: {
                   maxEntries: 50,
                   maxAgeSeconds: 60 * 60 // 1 heure
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
                 }
               }
             }
           ]
         },
         devOptions: {
-          enabled: isDevelopment,
-          type: 'module'
+          enabled: false // Désactiver en dev pour éviter les conflits
         }
       })
     ],
@@ -111,6 +134,7 @@ export default defineConfig(({ mode }) => {
         '@utils': path.resolve(__dirname, './src/utils'),
         '@directives': path.resolve(__dirname, './src/directives'),
         '@router': path.resolve(__dirname, './src/router'),
+        '@views': path.resolve(__dirname, './src/views'),
         '@types': path.resolve(__dirname, './src/types')
       },
       extensions: ['.vue', '.js', '.ts', '.jsx', '.tsx', '.json']
@@ -133,7 +157,7 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api/, ''),
           configure: (proxy) => {
             proxy.on('error', (err) => {
-              console.error('Proxy error:', err)
+              console.error('❌ Proxy error:', err.message)
             })
           }
         },
@@ -156,28 +180,59 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false
+        },
+        '/ws': {
+          target: apiProxyTarget.replace(/^http/, 'ws'),
+          changeOrigin: true,
+          ws: true
         }
       },
       watch: {
         usePolling: false,
-        ignored: ['**/node_modules/**', '**/dist/**']
-      },
-      hmr: {
-        overlay: true,
-        protocol: 'ws',
-        host: 'localhost',
-        port: 5173
+        ignored: ['**/node_modules/**', '**/dist/**', '**/.vite-cache/**']
       }
     },
 
     // ======================================================================
-    //  Preview (production)
+    //  Preview (aperçu du build de production)
     // ======================================================================
     preview: {
       port: 4173,
       host: '0.0.0.0',
       strictPort: false,
-      cors: true
+      cors: true,
+      proxy: {
+        '/api': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        '/docs': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        '/redoc': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        '/openapi.json': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        '/health': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        '/ws': {
+          target: apiProxyTarget.replace(/^http/, 'ws'),
+          changeOrigin: true,
+          ws: true
+        }
+      }
     },
 
     // ======================================================================
@@ -190,6 +245,9 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',
       target: 'es2020',
       chunkSizeWarningLimit: 1000,
+      assetsInlineLimit: 4096, // 4 KB
+      cssCodeSplit: true,
+      reportCompressedSize: false,
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html')
@@ -198,17 +256,10 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             // Frameworks principaux
             'vendor-vue': ['vue', 'vue-router', 'pinia'],
-            'vendor-utils': ['axios', 'dayjs', '@vueuse/core'],
-            // UI et composants
-            'vendor-ui': ['@vueuse/core'],
-            // Séparer les dépendances tierces lourdes
-            'vendor-other': (id) => {
-              if (id.includes('node_modules')) {
-                return 'vendor-other'
-              }
-            }
+            // Bibliothèques utilitaires
+            'vendor-utils': ['axios', 'dayjs', '@vueuse/core']
           },
-          // Noms de fichiers avec hash pour cache busting
+          // Nommage des fichiers avec hash pour cache busting
           entryFileNames: 'assets/js/[name].[hash].js',
           chunkFileNames: 'assets/js/[name].[hash].js',
           assetFileNames: (assetInfo) => {
@@ -217,7 +268,7 @@ export default defineConfig(({ mode }) => {
             if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
               return 'assets/images/[name].[hash].[ext]'
             }
-            if (/woff2?|ttf|eot/i.test(ext)) {
+            if (/woff2?|ttf|eot|otf/i.test(ext)) {
               return 'assets/fonts/[name].[hash].[ext]'
             }
             if (/css/i.test(ext)) {
@@ -227,20 +278,15 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      // Optimisations supplémentaires
       commonjsOptions: {
         transformMixedEsModules: true
       },
-      // Augmenter la taille limite pour les chunks
-      chunkSizeWarningLimit: 1000,
-      // Minifier les CSS
-      cssMinify: true,
-      // Empty outDir before build
       emptyOutDir: true,
-      // Copier les fichiers public
       copyPublicDir: true,
-      // Polyfill pour les navigateurs plus anciens
-      polyfillModulePreload: true
+      // Désactiver le polyfill inutile
+      modulePreload: {
+        polyfill: false
+      }
     },
 
     // ======================================================================
@@ -253,11 +299,16 @@ export default defineConfig(({ mode }) => {
       },
       preprocessorOptions: {
         scss: {
-          // Ajouter automatiquement les styles globaux à tous les fichiers SCSS
-          additionalData: `
-            @import "@assets/styles/nexus-theme.scss";
-            @import "@assets/styles/global.scss";
-          `,
+          // ✅ CORRECTION CRITIQUE :
+          // Ne PAS injecter automatiquement `nexus-theme.scss` et `global.scss`
+          // via `additionalData`, car cela cause un import circulaire
+          // (le fichier s'importe lui-même) → erreur "This file is already being loaded".
+          //
+          // Les styles globaux sont importés explicitement dans `src/main.js`.
+          //
+          // Si vous souhaitez injecter uniquement des VARIABLES SCSS (sans règles CSS),
+          // créez un fichier `src/assets/styles/variables.scss` et décommentez :
+          // additionalData: `@import "@assets/styles/variables.scss";`,
           api: 'modern-compiler',
           quietDeps: true,
           silenceDeprecations: ['legacy-js-api']
@@ -268,24 +319,30 @@ export default defineConfig(({ mode }) => {
           autoprefixer({
             overrideBrowserslist: ['> 1%', 'last 2 versions', 'not dead']
           }),
-          cssnano({
-            preset: [
-              'default',
-              {
-                discardComments: { removeAll: true },
-                normalizeWhitespace: true,
-                mergeRules: true,
-                reduceTransforms: true
-              }
-            ]
-          })
+          ...(isProduction
+            ? [
+                cssnano({
+                  preset: [
+                    'default',
+                    {
+                      discardComments: { removeAll: true },
+                      normalizeWhitespace: true,
+                      mergeRules: true,
+                      reduceTransforms: true,
+                      minifyFontValues: true,
+                      minifySelectors: true
+                    }
+                  ]
+                })
+              ]
+            : [])
         ]
       },
       devSourcemap: isDevelopment
     },
 
     // ======================================================================
-    //  Optimisations de performance
+    //  Optimisations des dépendances
     // ======================================================================
     optimizeDeps: {
       include: [
@@ -299,7 +356,8 @@ export default defineConfig(({ mode }) => {
       exclude: [],
       esbuildOptions: {
         target: 'es2020',
-        treeShaking: true
+        treeShaking: true,
+        legalComments: 'none'
       },
       force: false
     },
@@ -315,17 +373,17 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Options ESBuild (pour le transpile)
+    //  Options ESBuild (transpilation)
     // ======================================================================
     esbuild: {
-      // Supprimer les console.log en production
+      // Supprimer les console.log et debugger en production
       drop: isProduction ? ['console', 'debugger'] : [],
       target: 'es2020',
       legalComments: 'none',
       treeShaking: true,
-      minifySyntax: true,
-      minifyIdentifiers: true,
-      minifyWhitespace: true
+      minifySyntax: isProduction,
+      minifyIdentifiers: isProduction,
+      minifyWhitespace: isProduction
     },
 
     // ======================================================================
@@ -337,20 +395,6 @@ export default defineConfig(({ mode }) => {
     //  Logs
     // ======================================================================
     logLevel: isProduction ? 'warn' : 'info',
-    clearScreen: true,
-
-    // ======================================================================
-    //  Mode legacy (optionnel)
-    // ======================================================================
-    // build: {
-    //   rollupOptions: {
-    //     plugins: [
-    //       // Pour la compatibilité avec les navigateurs plus anciens
-    //       // legacy({
-    //       //   targets: ['defaults', 'not IE 11']
-    //       // })
-    //     ]
-    //   }
-    // }
+    clearScreen: true
   }
 })
