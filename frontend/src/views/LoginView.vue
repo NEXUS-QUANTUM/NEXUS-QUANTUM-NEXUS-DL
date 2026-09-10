@@ -1,5 +1,5 @@
 <!-- ==========================================================================
-  NexusDL 2.0 - Login View (version complète)
+  NexusDL 2.0 - Login View (version complète) 
   Fichier : frontend/src/views/LoginView.vue
   Description : Page de connexion avec support complet : formulaire, validation,
                 gestion d'erreurs, "se souvenir de moi", OAuth (optionnel),
