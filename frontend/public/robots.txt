@@ -1,0 +1,30 @@
+# ==========================================================================
+#  NexusDL 2.0 - robots.txt
+# ==========================================================================
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /login
+Disallow: /register
+
+# Sitemap
+Sitemap: https://nexusdl.local/sitemap.xml
+
+# Crawl-delay pour les robots agressifs
+Crawl-delay: 1
+
+# Bloquer les bots indésirables
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
