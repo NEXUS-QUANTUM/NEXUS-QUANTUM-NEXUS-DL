@@ -3,11 +3,8 @@
 #  Fichier : frontend/Dockerfile
 #  Description : Image Docker pour l'interface Vue.js 3 avec Nginx
 #  Version : 2.0.0
-#  Architecture : Multi-stage (builder Node.js + production Nginx)
 #
-#  ⚠️ IMPORTANT : Ce Dockerfile nécessite le fichier `nginx.conf` situé
-#  dans le même répertoire (frontend/nginx.conf). Voir ci-dessous pour
-#  le contenu complet de ce fichier.
+#  ⚠️ Correction : npm install SANS --omit=dev (car Vite est une devDependency)
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -17,7 +14,7 @@
 FROM node:20-alpine AS builder
 
 # --- Configuration pour optimiser les builds ---
-ENV NODE_ENV=production \
+ENV NODE_ENV=development \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_CACHE=/tmp/.npm-cache \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -44,9 +41,9 @@ WORKDIR /app
 # --- Copier les fichiers de dépendances (pour profiter du cache Docker) ---
 COPY package*.json ./
 
-# --- Installer les dépendances avec npm install (pas de package-lock.json) ---
-# On utilise `npm install --omit=dev` pour n'installer que les dépendances de production.
-RUN npm install --omit=dev --no-audit --no-fund --no-progress \
+# --- Installer TOUTES les dépendances (prod + dev) ---
+# ✅ CORRECTION : on n'utilise PAS --omit=dev car vite est une devDependency
+RUN npm install --no-audit --no-fund --no-progress \
     && npm cache clean --force \
     && rm -rf /tmp/.npm-cache
 
@@ -99,7 +96,6 @@ RUN apk add --no-cache \
 RUN addgroup -g 101 -S nginx && adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx
 
 # --- Copier la configuration Nginx personnalisée ---
-# ⚠️ Ce fichier DOIT exister dans frontend/nginx.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # --- Copier les fichiers construits depuis le builder ---
