@@ -1,18 +1,31 @@
 {
-  "name": "nexus-dl-frontend",
+  "name": "NEXUS-QUANTUM-NEXUS-DL",
   "version": "2.0.0",
   "description": "🧬 NexusDL 2.0 - Interface Web pour le téléchargement de scans (manga, manhwa, webtoon, doujinshi)",
   "license": "GPL-3.0-only",
   "type": "module",
-  "author": "NexusDL Community <nexusdl@example.com>",
+  "private": true,
+  "author": "NexusDL Community <drxenon487@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nexus-dl/nexus-dl.git"
+    "url": "https://github.com/NEXUS-QUANTUM/nexus-dl.git"
   },
   "bugs": {
-    "url": "https://github.com/nexus-dl/nexus-dl/issues"
+    "url": "https://github.com/NEXUS-QUANTUM/nexus-dl/issues"
   },
-  "homepage": "https://github.com/nexus-dl/nexus-dl#readme",
+  "homepage": "https://github.com/NEXUS-QUANTUM/nexus-dl#readme",
+  "keywords": [
+    "manga",
+    "manhwa",
+    "webtoon",
+    "doujinshi",
+    "scan",
+    "downloader",
+    "cbz",
+    "vue",
+    "vite",
+    "pwa"
+  ],
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
@@ -20,18 +33,24 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "build:prod": "npm run type-check && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "serve": "vite preview --host 0.0.0.0 --port 4173",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx --fix --ignore-path .gitignore",
+    "lint:check": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx --ignore-path .gitignore",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "type-check": "vue-tsc --noEmit",
     "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
     "test:run": "vitest run",
-    "clean": "rm -rf dist .vite-cache coverage",
-    "build:prod": "npm run type-check && npm run build"
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist .vite-cache coverage node_modules/.vite",
+    "clean:all": "rm -rf dist .vite-cache coverage node_modules",
+    "reinstall": "npm run clean:all && npm install",
+    "docker:build": "docker build -t nexusdl-frontend .",
+    "docker:run": "docker run -p 80:80 nexusdl-frontend"
   },
   "dependencies": {
     "vue": "^3.4.27",
@@ -50,6 +69,7 @@
     "sass": "^1.77.4",
     "autoprefixer": "^10.4.19",
     "cssnano": "^7.0.3",
+    "postcss": "^8.4.38",
     "eslint": "^8.57.0",
     "eslint-plugin-vue": "^9.26.0",
     "eslint-plugin-import": "^2.29.1",
@@ -58,14 +78,16 @@
     "vue-tsc": "^2.0.19",
     "vitest": "^1.6.0",
     "@vitest/ui": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "jsdom": "^24.0.0",
-    "@vue/test-utils": "^2.4.6"
-  },
-  "peerDependencies": {
-    "vue": "^3.4.0"
+    "@vue/test-utils": "^2.4.6",
+    "@types/node": "^20.14.2"
   },
   "optionalDependencies": {
     "@rollup/plugin-brotli": "^3.1.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
   },
   "browserslist": [
     "> 1%",
@@ -80,28 +102,99 @@
     "trailingComma": "es5",
     "printWidth": 100,
     "bracketSpacing": true,
+    "arrowParens": "always",
+    "endOfLine": "lf",
     "vueIndentScriptAndStyle": false
   },
   "eslintConfig": {
     "root": true,
     "env": {
       "browser": true,
-      "es2021": true,
+      "es2022": true,
       "node": true
     },
     "extends": [
       "eslint:recommended",
-      "plugin:vue/vue3-recommended"
+      "plugin:vue/vue3-recommended",
+      "plugin:import/recommended"
     ],
     "parserOptions": {
       "ecmaVersion": "latest",
-      "sourceType": "module"
+      "sourceType": "module",
+      "ecmaFeatures": {
+        "jsx": true
+      }
+    },
+    "settings": {
+      "import/resolver": {
+        "alias": {
+          "map": [
+            ["@", "./src"],
+            ["@components", "./src/components"],
+            ["@common", "./src/components/common"],
+            ["@stores", "./src/stores"],
+            ["@composables", "./src/composables"],
+            ["@assets", "./src/assets"],
+            ["@utils", "./src/utils"],
+            ["@directives", "./src/directives"],
+            ["@router", "./src/router"],
+            ["@views", "./src/views"],
+            ["@types", "./src/types"]
+          ],
+          "extensions": [".js", ".jsx", ".ts", ".tsx", ".vue", ".json"]
+        }
+      }
     },
     "rules": {
       "vue/multi-word-component-names": "off",
       "vue/no-v-html": "off",
+      "vue/require-default-prop": "off",
+      "vue/require-explicit-emits": "warn",
+      "vue/component-name-in-template-casing": ["warn", "PascalCase"],
+      "vue/component-definition-name-casing": ["warn", "PascalCase"],
+      "vue/max-attributes-per-line": "off",
+      "vue/singleline-html-element-content-newline": "off",
+      "vue/html-self-closing": "off",
       "no-console": "off",
-      "no-debugger": "warn"
+      "no-debugger": "warn",
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+      "import/order": [
+        "warn",
+        {
+          "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+          "newlines-between": "always",
+          "alphabetize": { "order": "asc", "caseInsensitive": true }
+        }
+      ]
+    },
+    "ignorePatterns": [
+      "dist",
+      "node_modules",
+      "coverage",
+      ".vite-cache",
+      "*.config.js"
+    ]
+  },
+  "stylelint": {
+    "extends": "stylelint-config-standard-scss",
+    "rules": {
+      "at-rule-no-unknown": [
+        true,
+        {
+          "ignoreAtRules": ["apply", "layer", "tailwind", "screen", "use", "forward", "mixin", "include", "extend", "if", "else", "each", "for", "while", "function", "return", "debug", "warn", "error"]
+        }
+      ],
+      "selector-class-pattern": null,
+      "scss/dollar-variable-pattern": "^[a-z][a-zA-Z0-9-]*$",
+      "scss/at-mixin-pattern": "^[a-z][a-zA-Z0-9-]*$"
     }
-  }
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "sideEffects": [
+    "*.css",
+    "*.scss",
+    "*.vue"
+  ]
 }
