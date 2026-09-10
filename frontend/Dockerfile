@@ -1,10 +1,13 @@
 # ==========================================================================
-#  NexusDL 2.0 - Frontend Dockerfile (corrigé)
+#  NexusDL 2.0 - Frontend Dockerfile (version complète et corrigée)
 #  Fichier : frontend/Dockerfile
 #  Description : Image Docker pour l'interface Vue.js 3 avec Nginx
 #  Version : 2.0.0
 #  Architecture : Multi-stage (builder Node.js + production Nginx)
-#  Corrections : utilisation de npm install (pas de package-lock.json)
+#
+#  ⚠️ IMPORTANT : Ce Dockerfile nécessite le fichier `nginx.conf` situé
+#  dans le même répertoire (frontend/nginx.conf). Voir ci-dessous pour
+#  le contenu complet de ce fichier.
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -40,11 +43,9 @@ WORKDIR /app
 
 # --- Copier les fichiers de dépendances (pour profiter du cache Docker) ---
 COPY package*.json ./
-COPY .npmrc ./
 
 # --- Installer les dépendances avec npm install (pas de package-lock.json) ---
 # On utilise `npm install --omit=dev` pour n'installer que les dépendances de production.
-# L'option `--omit=dev` est l'équivalent moderne de `--only=production`.
 RUN npm install --omit=dev --no-audit --no-fund --no-progress \
     && npm cache clean --force \
     && rm -rf /tmp/.npm-cache
@@ -98,6 +99,7 @@ RUN apk add --no-cache \
 RUN addgroup -g 101 -S nginx && adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx
 
 # --- Copier la configuration Nginx personnalisée ---
+# ⚠️ Ce fichier DOIT exister dans frontend/nginx.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # --- Copier les fichiers construits depuis le builder ---
