@@ -1,8 +1,8 @@
 // ==========================================================================
-//  NexusDL 2.0 - Vite Configuration (version corrigée et complète)
+//  NexusDL 2.0 - Vite Configuration (version complète et corrigée)
 //  Fichier : frontend/vite.config.js
-//  Description : Configuration Vite pour Vue.js 3, avec correction de
-//                l'import circulaire SCSS qui causait l'erreur de build.
+//  Description : Configuration Vite pour Vue.js 3, avec PWA, compression,
+//                proxy API, et correction de l'import circulaire SCSS.
 //  Version : 2.0.0
 // ==========================================================================
 
@@ -15,11 +15,11 @@ import autoprefixer from 'autoprefixer'
 import cssnano from 'cssnano'
 
 // ==========================================================================
-//  Configuration de base
+//  Configuration principale
 // ==========================================================================
 
 export default defineConfig(({ mode }) => {
-  // Charger les variables d'environnement
+  // Chargement des variables d'environnement (VITE_*)
   const env = loadEnv(mode, process.cwd(), '')
   const apiProxyTarget = env.VITE_API_BACKEND_URL || 'http://localhost:8000'
   const isProduction = mode === 'production'
@@ -27,10 +27,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     // ======================================================================
-    //  Plugins
+    //  PLUGINS
     // ======================================================================
     plugins: [
-      // Vue 3 avec Composition API
+      // --------------------------------------------------------------------
+      //  Vue 3 - Support SFC et Composition API
+      // --------------------------------------------------------------------
       vue({
         template: {
           transformAssetUrls: {
@@ -43,7 +45,9 @@ export default defineConfig(({ mode }) => {
         }
       }),
 
-      // Compression gzip (production uniquement)
+      // --------------------------------------------------------------------
+      //  Compression Gzip (production uniquement)
+      // --------------------------------------------------------------------
       compression({
         algorithm: 'gzip',
         ext: '.gz',
@@ -52,7 +56,9 @@ export default defineConfig(({ mode }) => {
         disable: !isProduction
       }),
 
-      // Compression brotli (production uniquement)
+      // --------------------------------------------------------------------
+      //  Compression Brotli (production uniquement)
+      // --------------------------------------------------------------------
       compression({
         algorithm: 'brotliCompress',
         ext: '.br',
@@ -61,14 +67,18 @@ export default defineConfig(({ mode }) => {
         disable: !isProduction
       }),
 
-      // PWA (Progressive Web App)
+      // --------------------------------------------------------------------
+      //  PWA (Progressive Web App)
+      // --------------------------------------------------------------------
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
-        manifest: false, // Utiliser /public/manifest.json
+        manifest: false, // Utilise /public/manifest.json
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          cleanupOutdatedCaches: true,
           runtimeCaching: [
+            // --- Google Fonts ---
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -97,31 +107,45 @@ export default defineConfig(({ mode }) => {
                 }
               }
             },
+            // --- API NexusDL ---
             {
               urlPattern: /\/api\/.*/i,
               handler: 'NetworkFirst',
               options: {
-                cacheName: 'api-cache',
+                cacheName: 'nexusdl-api-cache',
                 networkTimeoutSeconds: 10,
                 expiration: {
-                  maxEntries: 50,
+                  maxEntries: 100,
                   maxAgeSeconds: 60 * 60 // 1 heure
                 },
                 cacheableResponse: {
                   statuses: [0, 200]
                 }
               }
+            },
+            // --- Images distantes (couvertures) ---
+            {
+              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'images-cache',
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 jours
+                }
+              }
             }
           ]
         },
         devOptions: {
-          enabled: false // Désactiver en dev pour éviter les conflits
+          enabled: false // Désactivé en dev pour éviter les conflits
         }
       })
     ],
 
     // ======================================================================
-    //  Résolution des alias
+    //  RÉSOLUTION DES ALIAS
+    //  ⚠️ Doit correspondre à `paths` dans tsconfig.json
     // ======================================================================
     resolve: {
       alias: {
@@ -141,7 +165,7 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Serveur de développement
+    //  SERVEUR DE DÉVELOPPEMENT
     // ======================================================================
     server: {
       port: 5173,
@@ -150,6 +174,7 @@ export default defineConfig(({ mode }) => {
       open: false,
       cors: true,
       proxy: {
+        // --- API REST ---
         '/api': {
           target: apiProxyTarget,
           changeOrigin: true,
@@ -157,34 +182,40 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api/, ''),
           configure: (proxy) => {
             proxy.on('error', (err) => {
-              console.error('❌ Proxy error:', err.message)
+              console.error('❌ [Proxy] Erreur API :', err.message)
             })
           }
         },
+        // --- Documentation Swagger ---
         '/docs': {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false
         },
+        // --- Documentation ReDoc ---
         '/redoc': {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false
         },
+        // --- Schéma OpenAPI ---
         '/openapi.json': {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false
         },
+        // --- Healthcheck ---
         '/health': {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false
         },
+        // --- WebSocket ---
         '/ws': {
           target: apiProxyTarget.replace(/^http/, 'ws'),
           changeOrigin: true,
-          ws: true
+          ws: true,
+          secure: false
         }
       },
       watch: {
@@ -194,7 +225,7 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Preview (aperçu du build de production)
+    //  APERÇU DU BUILD (preview)
     // ======================================================================
     preview: {
       port: 4173,
@@ -236,7 +267,7 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Build (production)
+    //  BUILD (PRODUCTION)
     // ======================================================================
     build: {
       outDir: 'dist',
@@ -248,24 +279,28 @@ export default defineConfig(({ mode }) => {
       assetsInlineLimit: 4096, // 4 KB
       cssCodeSplit: true,
       reportCompressedSize: false,
+      emptyOutDir: true,
+      copyPublicDir: true,
+      modulePreload: {
+        polyfill: false
+      },
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html')
         },
         output: {
+          // --- Découpage manuel des chunks ---
           manualChunks: {
-            // Frameworks principaux
             'vendor-vue': ['vue', 'vue-router', 'pinia'],
-            // Bibliothèques utilitaires
             'vendor-utils': ['axios', 'dayjs', '@vueuse/core']
           },
-          // Nommage des fichiers avec hash pour cache busting
+          // --- Nommage des fichiers avec hash ---
           entryFileNames: 'assets/js/[name].[hash].js',
           chunkFileNames: 'assets/js/[name].[hash].js',
           assetFileNames: (assetInfo) => {
             const info = assetInfo.name.split('.')
             const ext = info[info.length - 1]
-            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            if (/png|jpe?g|svg|gif|tiff|bmp|ico|webp|avif/i.test(ext)) {
               return 'assets/images/[name].[hash].[ext]'
             }
             if (/woff2?|ttf|eot|otf/i.test(ext)) {
@@ -280,17 +315,16 @@ export default defineConfig(({ mode }) => {
       },
       commonjsOptions: {
         transformMixedEsModules: true
-      },
-      emptyOutDir: true,
-      copyPublicDir: true,
-      // Désactiver le polyfill inutile
-      modulePreload: {
-        polyfill: false
       }
     },
 
     // ======================================================================
-    //  CSS
+    //  CSS / SCSS
+    //  ⚠️ CORRECTION CRITIQUE :
+    //  NE PAS injecter `nexus-theme.scss` ou `global.scss` via `additionalData`
+    //  car cela crée un import circulaire → erreur "This file is already being loaded".
+    //
+    //  Les styles globaux sont importés explicitement dans `src/main.js`.
     // ======================================================================
     css: {
       modules: {
@@ -299,19 +333,10 @@ export default defineConfig(({ mode }) => {
       },
       preprocessorOptions: {
         scss: {
-          // ✅ CORRECTION CRITIQUE :
-          // Ne PAS injecter automatiquement `nexus-theme.scss` et `global.scss`
-          // via `additionalData`, car cela cause un import circulaire
-          // (le fichier s'importe lui-même) → erreur "This file is already being loaded".
-          //
-          // Les styles globaux sont importés explicitement dans `src/main.js`.
-          //
-          // Si vous souhaitez injecter uniquement des VARIABLES SCSS (sans règles CSS),
-          // créez un fichier `src/assets/styles/variables.scss` et décommentez :
-          // additionalData: `@import "@assets/styles/variables.scss";`,
           api: 'modern-compiler',
           quietDeps: true,
           silenceDeprecations: ['legacy-js-api']
+          // ✅ Pas de `additionalData` ici (voir commentaire ci-dessus)
         }
       },
       postcss: {
@@ -342,7 +367,7 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Optimisations des dépendances
+    //  OPTIMISATION DES DÉPENDANCES
     // ======================================================================
     optimizeDeps: {
       include: [
@@ -363,7 +388,7 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Variables d'environnement exposées au client
+    //  VARIABLES GLOBALES EXPOSÉES AU CLIENT
     // ======================================================================
     define: {
       __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || '2.0.0'),
@@ -373,10 +398,9 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Options ESBuild (transpilation)
+    //  OPTIONS ESBUILD (transpilation)
     // ======================================================================
     esbuild: {
-      // Supprimer les console.log et debugger en production
       drop: isProduction ? ['console', 'debugger'] : [],
       target: 'es2020',
       legalComments: 'none',
@@ -387,12 +411,12 @@ export default defineConfig(({ mode }) => {
     },
 
     // ======================================================================
-    //  Cache
+    //  CACHE
     // ======================================================================
     cacheDir: '.vite-cache',
 
     // ======================================================================
-    //  Logs
+    //  LOGS
     // ======================================================================
     logLevel: isProduction ? 'warn' : 'info',
     clearScreen: true
