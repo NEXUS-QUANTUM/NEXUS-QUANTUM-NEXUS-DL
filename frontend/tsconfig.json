@@ -1,39 +1,72 @@
 {
+  // ==========================================================================
+  //  NexusDL 2.0 - TypeScript Configuration
+  //  Fichier : frontend/tsconfig.json
+  //  Description : Configuration TypeScript complète pour l'application Vue.js 3
+  //  Version : 2.0.0
+  // ==========================================================================
+
   "compilerOptions": {
-    // ======================================================================
+    // ----------------------------------------------------------------------
     //  Options de langage et d'environnement
-    // ======================================================================
+    // ----------------------------------------------------------------------
     "target": "ES2020",
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
 
-    // ======================================================================
+    // ----------------------------------------------------------------------
     //  Résolution des modules
-    // ======================================================================
+    // ----------------------------------------------------------------------
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "preserve",
+    "jsxImportSource": "vue",
 
-    // ======================================================================
-    //  Contrôle de la qualité du code
-    // ======================================================================
+    // ----------------------------------------------------------------------
+    //  Contrôle de la qualité du code (strict)
+    // ----------------------------------------------------------------------
     "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
     "exactOptionalPropertyTypes": false,
     "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
 
-    // ======================================================================
-    //  Alias de chemins
-    // ======================================================================
+    // ----------------------------------------------------------------------
+    //  Décorateurs (optionnel, utile pour certaines libs)
+    // ----------------------------------------------------------------------
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+
+    // ----------------------------------------------------------------------
+    //  Import/Export helpers
+    // ----------------------------------------------------------------------
+    "importsNotUsedAsValues": "remove",
+    "preserveValueImports": false,
+    "verbatimModuleSyntax": false,
+
+    // ----------------------------------------------------------------------
+    //  Alias de chemins (doit correspondre à vite.config.js)
+    // ----------------------------------------------------------------------
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
@@ -45,31 +78,28 @@
       "@utils/*": ["./src/utils/*"],
       "@directives/*": ["./src/directives/*"],
       "@router/*": ["./src/router/*"],
+      "@views/*": ["./src/views/*"],
       "@types/*": ["./src/types/*"]
     },
 
-    // ======================================================================
+    // ----------------------------------------------------------------------
     //  Types globaux
-    // ======================================================================
+    // ----------------------------------------------------------------------
     "types": [
       "vite/client",
       "vitest/globals",
       "node"
     ],
 
-    // ======================================================================
-    //  Autres options
-    // ======================================================================
-    "forceConsistentCasingInFileNames": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": false,
-    "importsNotUsedAsValues": "remove"
+    // ----------------------------------------------------------------------
+    //  Options d'optimisation
+    // ----------------------------------------------------------------------
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
   },
 
   // ==========================================================================
-  //  Fichiers inclus
+  //  Fichiers inclus dans la compilation
   // ==========================================================================
   "include": [
     "src/**/*.ts",
@@ -80,36 +110,43 @@
     "src/**/*.jsx",
     "tests/**/*.ts",
     "tests/**/*.vue",
+    "env.d.ts",
     "vite.config.ts",
     "vitest.config.ts"
   ],
 
   // ==========================================================================
-  //  Fichiers exclus
+  //  Fichiers exclus de la compilation
   // ==========================================================================
   "exclude": [
     "node_modules",
     "dist",
+    "build",
     "coverage",
-    "*.config.js",
+    ".vite-cache",
     "**/*.spec.ts",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "**/*.spec.js",
+    "**/*.test.js"
   ],
 
   // ==========================================================================
   //  Options spécifiques à Vue (vue-tsc)
   // ==========================================================================
   "vueCompilerOptions": {
-    "experimentalDisableTemplateSupport": false,
     "target": 3,
     "strictTemplates": true,
     "strictProps": true,
     "strictCustomEvents": true,
-    "strictSlots": true
+    "strictSlots": true,
+    "experimentalDisableTemplateSupport": false,
+    "experimentalRfcs": {
+      "skipTemplateCodegen": false
+    }
   },
 
   // ==========================================================================
-  //  Références (pour les fichiers de configuration)
+  //  Références aux autres configurations TypeScript
   // ==========================================================================
   "references": [
     { "path": "./tsconfig.node.json" }
