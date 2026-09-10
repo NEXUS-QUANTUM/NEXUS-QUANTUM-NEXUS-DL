@@ -1,8 +1,15 @@
 // ==========================================================================
-//  NexusDL 2.0 - Notifications Store (Pinia)
+//  NexusDL 2.0 - Notifications Store (version complète et finale)
 //  Fichier : frontend/src/stores/notifications.js
-//  Description : Gestion centralisée des notifications (toasts, alertes, erreurs, historique)
+//  Description : Gestion centralisée des notifications (toasts, alertes,
+//                erreurs, historique) avec persistance localStorage.
 //  Version : 2.0.0
+//  Licence : GNU GPL v3.0
+//
+//  ⚠️ CORRECTION APPLIQUÉE :
+//  - La fonction `error` a été renommée en `showError` pour éviter le
+//    conflit avec la variable d'état `error` (renommée en `stateError`).
+//  - Toutes les références internes ont été mises à jour.
 // ==========================================================================
 
 import { defineStore } from 'pinia'
@@ -27,7 +34,7 @@ export const NOTIFICATION_TYPES = {
   ERROR: 'error',
   WARNING: 'warning',
   INFO: 'info',
-  SYSTEM: 'system',
+  SYSTEM: 'system'
 }
 
 // ==========================================================================
@@ -48,14 +55,22 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /** Liste des notifications (historique) */
   const notifications = ref([])
+
   /** ID incrémentiel pour générer des identifiants uniques */
   let _idCounter = 0
-  /** Indicateur de chargement (pour les opérations) */
+
+  /** Indicateur de chargement */
   const isLoading = ref(false)
-  /** Erreur liée au store */
-  const error = ref(null)
+
+  /**
+   * ⚠️ CORRECTION : variable d'état renommée en `stateError`
+   * pour éviter le conflit avec la fonction `showError`.
+   */
+  const stateError = ref(null)
+
   /** Dernière mise à jour */
   const lastUpdated = ref(null)
+
   /** Si les notifications sont persistées */
   const isPersisted = ref(false)
 
@@ -67,10 +82,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const total = computed(() => notifications.value.length)
 
   /** Notifications non lues */
-  const unread = computed(() => notifications.value.filter(n => !n.read))
+  const unread = computed(() => notifications.value.filter((n) => !n.read))
 
   /** Notifications lues */
-  const read = computed(() => notifications.value.filter(n => n.read))
+  const read = computed(() => notifications.value.filter((n) => n.read))
 
   /** Nombre de notifications non lues */
   const unreadCount = computed(() => unread.value.length)
@@ -83,25 +98,30 @@ export const useNotificationsStore = defineStore('notifications', () => {
     return sorted
   })
 
-  /** Notifications par type */
-  const byType = (type) => computed(() =>
-    notifications.value.filter(n => n.type === type)
+  /** Notifications de succès */
+  const successes = computed(() =>
+    notifications.value.filter((n) => n.type === NOTIFICATION_TYPES.SUCCESS)
   )
 
-  /** Notifications de succès */
-  const successes = computed(() => notifications.value.filter(n => n.type === NOTIFICATION_TYPES.SUCCESS))
-
   /** Notifications d'erreur */
-  const errors = computed(() => notifications.value.filter(n => n.type === NOTIFICATION_TYPES.ERROR))
+  const errors = computed(() =>
+    notifications.value.filter((n) => n.type === NOTIFICATION_TYPES.ERROR)
+  )
 
   /** Notifications d'avertissement */
-  const warnings = computed(() => notifications.value.filter(n => n.type === NOTIFICATION_TYPES.WARNING))
+  const warnings = computed(() =>
+    notifications.value.filter((n) => n.type === NOTIFICATION_TYPES.WARNING)
+  )
 
   /** Notifications d'information */
-  const infos = computed(() => notifications.value.filter(n => n.type === NOTIFICATION_TYPES.INFO))
+  const infos = computed(() =>
+    notifications.value.filter((n) => n.type === NOTIFICATION_TYPES.INFO)
+  )
 
   /** Notifications système */
-  const system = computed(() => notifications.value.filter(n => n.type === NOTIFICATION_TYPES.SYSTEM))
+  const systemMessages = computed(() =>
+    notifications.value.filter((n) => n.type === NOTIFICATION_TYPES.SYSTEM)
+  )
 
   /** Vérifie s'il y a des notifications non lues */
   const hasUnread = computed(() => unreadCount.value > 0)
@@ -129,7 +149,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Formate la date pour l'affichage.
-   * @param {Date|string} date - Date
+   * @param {Date|string} date
    * @returns {string}
    */
   function formatDate(date) {
@@ -141,7 +161,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
+      second: '2-digit'
     })
   }
 
@@ -150,22 +170,21 @@ export const useNotificationsStore = defineStore('notifications', () => {
    */
   function persist() {
     try {
-      // Ne persister que les notifications récentes (ex: dernières 100)
       const toPersist = notifications.value.slice(-MAX_HISTORY)
       const data = {
         notifications: toPersist,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
       isPersisted.value = true
     } catch (_) {
-      // Ignorer les erreurs de localStorage (ex: mode privé)
+      // Ignorer les erreurs de localStorage (mode privé, quota dépassé, etc.)
     }
   }
 
   /**
    * Charge les notifications depuis le localStorage.
-   * @returns {Array} - Liste des notifications chargées
+   * @returns {Array}
    */
   function loadPersisted() {
     try {
@@ -183,12 +202,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Nettoie les notifications trop anciennes.
-   * @param {number} maxAge - Âge maximum en jours (défaut: 30)
+   * @param {number} maxAge - Âge maximum en jours
    */
   function cleanOldNotifications(maxAge = 30) {
     const now = Date.now()
     const cutoff = now - maxAge * 24 * 60 * 60 * 1000
-    const toKeep = notifications.value.filter(n => {
+    const toKeep = notifications.value.filter((n) => {
       const createdAt = new Date(n.created_at).getTime()
       return createdAt >= cutoff
     })
@@ -202,23 +221,30 @@ export const useNotificationsStore = defineStore('notifications', () => {
     }
   }
 
+  /**
+   * Retourne l'icône correspondant au type de notification.
+   * @param {string} type
+   * @returns {string}
+   */
+  function getIconForType(type) {
+    const map = {
+      [NOTIFICATION_TYPES.SUCCESS]: '✅',
+      [NOTIFICATION_TYPES.ERROR]: '❌',
+      [NOTIFICATION_TYPES.WARNING]: '⚠️',
+      [NOTIFICATION_TYPES.INFO]: 'ℹ️',
+      [NOTIFICATION_TYPES.SYSTEM]: '🔄'
+    }
+    return map[type] || '📢'
+  }
+
   // ==========================================================================
-  //  Actions
+  //  Actions principales
   // ==========================================================================
 
   /**
    * Ajoute une notification.
-   * @param {Object} payload - Données de la notification
-   * @param {string} payload.message - Message
-   * @param {string} [payload.type=NOTIFICATION_TYPES.INFO] - Type de notification
-   * @param {number} [payload.duration] - Durée d'affichage en ms (0 = persistant)
-   * @param {boolean} [payload.showToast=true] - Afficher un toast en plus de l'historique
-   * @param {string} [payload.icon] - Icône personnalisée
-   * @param {Object} [payload.meta] - Métadonnées supplémentaires
-   * @param {string} [payload.action] - Texte d'action (bouton)
-   * @param {Function} [payload.onAction] - Callback lors de l'action
-   * @param {Function} [payload.onClose] - Callback lors de la fermeture
-   * @returns {Object} - Notification créée
+   * @param {Object} payload
+   * @returns {Object|null}
    */
   function add(payload) {
     const {
@@ -230,7 +256,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       meta = null,
       action = null,
       onAction = null,
-      onClose = null,
+      onClose = null
     } = payload
 
     if (!message) {
@@ -251,7 +277,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       onClose,
       created_at: new Date().toISOString(),
       read: false,
-      dismissed: false,
+      dismissed: false
     }
 
     // Ajouter à la liste (en tête)
@@ -267,7 +293,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     lastUpdated.value = new Date().toISOString()
 
     // Afficher un toast si demandé
-    if (showToast) {
+    if (showToast && toast && typeof toast.show === 'function') {
       const toastOptions = {
         type,
         duration,
@@ -275,13 +301,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
         closable: true,
         onClick: () => {
           if (onAction) onAction(notification)
-          // Marquer comme lu lors du clic
           markAsRead(notification.id)
         },
         onClose: () => {
           if (onClose) onClose(notification)
           dismiss(notification.id)
-        },
+        }
       }
       toast.show(message, toastOptions)
     }
@@ -291,29 +316,30 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Ajoute une notification de succès.
-   * @param {string} message - Message
-   * @param {Object} options - Options supplémentaires
-   * @returns {Object} - Notification créée
+   * @param {string} message
+   * @param {Object} options
+   * @returns {Object|null}
    */
   function success(message, options = {}) {
     return add({ ...options, message, type: NOTIFICATION_TYPES.SUCCESS })
   }
 
   /**
+   * ⚠️ CORRECTION : renommé `error` → `showError`
    * Ajoute une notification d'erreur.
-   * @param {string} message - Message
-   * @param {Object} options - Options supplémentaires
-   * @returns {Object} - Notification créée
+   * @param {string} message
+   * @param {Object} options
+   * @returns {Object|null}
    */
-  function error(message, options = {}) {
+  function showError(message, options = {}) {
     return add({ ...options, message, type: NOTIFICATION_TYPES.ERROR })
   }
 
   /**
    * Ajoute une notification d'avertissement.
-   * @param {string} message - Message
-   * @param {Object} options - Options supplémentaires
-   * @returns {Object} - Notification créée
+   * @param {string} message
+   * @param {Object} options
+   * @returns {Object|null}
    */
   function warning(message, options = {}) {
     return add({ ...options, message, type: NOTIFICATION_TYPES.WARNING })
@@ -321,19 +347,19 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Ajoute une notification d'information.
-   * @param {string} message - Message
-   * @param {Object} options - Options supplémentaires
-   * @returns {Object} - Notification créée
+   * @param {string} message
+   * @param {Object} options
+   * @returns {Object|null}
    */
   function info(message, options = {}) {
     return add({ ...options, message, type: NOTIFICATION_TYPES.INFO })
   }
 
   /**
-   * Ajoute une notification système (ex: maintenance).
-   * @param {string} message - Message
-   * @param {Object} options - Options supplémentaires
-   * @returns {Object} - Notification créée
+   * Ajoute une notification système.
+   * @param {string} message
+   * @param {Object} options
+   * @returns {Object|null}
    */
   function system(message, options = {}) {
     return add({ ...options, message, type: NOTIFICATION_TYPES.SYSTEM })
@@ -341,10 +367,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Supprime une notification de l'historique.
-   * @param {string} id - ID de la notification
+   * @param {string} id
    */
   function remove(id) {
-    const index = notifications.value.findIndex(n => n.id === id)
+    const index = notifications.value.findIndex((n) => n.id === id)
     if (index !== -1) {
       notifications.value.splice(index, 1)
       persist()
@@ -354,10 +380,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Marque une notification comme lue.
-   * @param {string} id - ID de la notification
+   * @param {string} id
    */
   function markAsRead(id) {
-    const notification = notifications.value.find(n => n.id === id)
+    const notification = notifications.value.find((n) => n.id === id)
     if (notification) {
       notification.read = true
       persist()
@@ -378,26 +404,27 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Marque une notification comme rejetée (dismissed).
-   * @param {string} id - ID de la notification
+   * @param {string} id
    */
   function dismiss(id) {
-    const notification = notifications.value.find(n => n.id === id)
+    const notification = notifications.value.find((n) => n.id === id)
     if (notification) {
       notification.dismissed = true
-      // Ne pas supprimer immédiatement, garder pour historique avec flag
       persist()
       lastUpdated.value = new Date().toISOString()
     }
   }
 
   /**
-   * Supprime toutes les notifications de l'historique (avec confirmation).
-   * @param {boolean} confirm - Demander confirmation
-   * @returns {boolean} - true si supprimé
+   * Supprime toutes les notifications de l'historique.
+   * @param {boolean} confirm
+   * @returns {boolean}
    */
   function clearAll(confirm = true) {
-    if (confirm && !window.confirm('Supprimer tout l\'historique des notifications ?')) {
-      return false
+    if (confirm && typeof window !== 'undefined') {
+      if (!window.confirm("Supprimer tout l'historique des notifications ?")) {
+        return false
+      }
     }
     notifications.value = []
     persist()
@@ -406,32 +433,38 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
 
   /**
-   * Supprime les notifications lues (avec confirmation).
-   * @param {boolean} confirm - Demander confirmation
-   * @returns {number} - Nombre de notifications supprimées
+   * Supprime les notifications lues.
+   * @param {boolean} confirm
+   * @returns {number}
    */
   function clearRead(confirm = true) {
-    if (confirm && !window.confirm('Supprimer toutes les notifications lues ?')) {
-      return 0
+    if (confirm && typeof window !== 'undefined') {
+      if (!window.confirm('Supprimer toutes les notifications lues ?')) {
+        return 0
+      }
     }
-    const count = notifications.value.filter(n => n.read).length
-    notifications.value = notifications.value.filter(n => !n.read)
+    const count = notifications.value.filter((n) => n.read).length
+    notifications.value = notifications.value.filter((n) => !n.read)
     persist()
     lastUpdated.value = new Date().toISOString()
     return count
   }
 
   /**
-   * Supprime les notifications qui ont été rejetées (dismissed) et sont lues.
-   * @param {boolean} confirm - Demander confirmation
-   * @returns {number} - Nombre de notifications supprimées
+   * Supprime les notifications rejetées et lues.
+   * @param {boolean} confirm
+   * @returns {number}
    */
   function cleanDismissed(confirm = true) {
-    if (confirm && !window.confirm('Supprimer les notifications rejetées ?')) {
-      return 0
+    if (confirm && typeof window !== 'undefined') {
+      if (!window.confirm('Supprimer les notifications rejetées ?')) {
+        return 0
+      }
     }
-    const count = notifications.value.filter(n => n.dismissed && n.read).length
-    notifications.value = notifications.value.filter(n => !(n.dismissed && n.read))
+    const count = notifications.value.filter((n) => n.dismissed && n.read).length
+    notifications.value = notifications.value.filter(
+      (n) => !(n.dismissed && n.read)
+    )
     persist()
     lastUpdated.value = new Date().toISOString()
     return count
@@ -439,7 +472,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   /**
    * Charge les notifications depuis le localStorage.
-   * @param {boolean} clearExisting - Effacer les notifications existantes
+   * @param {boolean} clearExisting
    */
   function loadFromStorage(clearExisting = true) {
     const stored = loadPersisted()
@@ -447,8 +480,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       if (clearExisting) {
         notifications.value = stored
       } else {
-        // Fusionner en évitant les doublons
-        const existingIds = new Set(notifications.value.map(n => n.id))
+        const existingIds = new Set(notifications.value.map((n) => n.id))
         for (const n of stored) {
           if (!existingIds.has(n.id)) {
             notifications.value.push(n)
@@ -467,15 +499,19 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
 
   /**
-   * Réinitialise le store (vide tout).
+   * Réinitialise le store.
    */
   function reset() {
     notifications.value = []
     isPersisted.value = false
     lastUpdated.value = null
-    error.value = null
+    stateError.value = null
     isLoading.value = false
-    localStorage.removeItem(STORAGE_KEY)
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (_) {
+      // Ignorer
+    }
   }
 
   // ==========================================================================
@@ -483,40 +519,24 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // ==========================================================================
 
   /**
-   * Retourne l'icône correspondant au type de notification.
-   * @param {string} type - Type de notification
-   * @returns {string} - Emoji icône
-   */
-  function getIconForType(type) {
-    const map = {
-      [NOTIFICATION_TYPES.SUCCESS]: '✅',
-      [NOTIFICATION_TYPES.ERROR]: '❌',
-      [NOTIFICATION_TYPES.WARNING]: '⚠️',
-      [NOTIFICATION_TYPES.INFO]: 'ℹ️',
-      [NOTIFICATION_TYPES.SYSTEM]: '🔄',
-    }
-    return map[type] || '📢'
-  }
-
-  /**
-   * Récupère les notifications pour un contexte donné (ex: une page).
-   * @param {string} context - Contexte (ex: 'library', 'downloads')
-   * @returns {Array} - Notifications filtrées
+   * Récupère les notifications pour un contexte donné.
+   * @param {string} context
+   * @returns {Array}
    */
   function getByContext(context) {
-    return notifications.value.filter(n => n.meta?.context === context)
+    return notifications.value.filter((n) => n.meta?.context === context)
   }
 
   /**
    * Récupère les notifications par plage de dates.
-   * @param {Date} start - Date de début
-   * @param {Date} end - Date de fin
-   * @returns {Array} - Notifications filtrées
+   * @param {Date} start
+   * @param {Date} end
+   * @returns {Array}
    */
   function getByDateRange(start, end) {
     const startTime = start.getTime()
     const endTime = end.getTime()
-    return notifications.value.filter(n => {
+    return notifications.value.filter((n) => {
       const t = new Date(n.created_at).getTime()
       return t >= startTime && t <= endTime
     })
@@ -527,14 +547,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // ==========================================================================
 
   /**
-   * Affiche une notification globale dans l'application (via appStore).
-   * @param {string} message - Message
-   * @param {string} type - Type
-   * @param {number} duration - Durée
+   * Affiche une notification globale dans l'application.
+   * @param {string} message
+   * @param {string} type
+   * @param {number} duration
    */
   function showGlobal(message, type = 'info', duration = 5000) {
-    appStore.showGlobalNotification(message, type, duration)
-    // Ajouter également dans l'historique
+    if (appStore && typeof appStore.showGlobalNotification === 'function') {
+      appStore.showGlobalNotification(message, type, duration)
+    }
     add({ message, type, duration, showToast: false })
   }
 
@@ -543,11 +564,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // ==========================================================================
 
   /**
-   * Initialise le store (charge les notifications persistées).
-   * @param {Object} options - Options
-   * @param {boolean} options.load - Charger les données persistées (défaut: true)
-   * @param {boolean} options.cleanOld - Nettoyer les anciennes notifications (défaut: true)
-   * @param {number} options.maxAge - Âge maximum en jours pour le nettoyage
+   * Initialise le store.
+   * @param {Object} options
    */
   function initialize({ load = true, cleanOld = true, maxAge = 30 } = {}) {
     isLoading.value = true
@@ -560,7 +578,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       }
       lastUpdated.value = new Date().toISOString()
     } catch (err) {
-      error.value = err
+      stateError.value = err
     } finally {
       isLoading.value = false
     }
@@ -571,24 +589,32 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // ==========================================================================
 
   // Persister automatiquement les changements
-  watch(notifications, () => {
-    persist()
-    lastUpdated.value = new Date().toISOString()
-  }, { deep: true })
+  watch(
+    notifications,
+    () => {
+      persist()
+      lastUpdated.value = new Date().toISOString()
+    },
+    { deep: true }
+  )
 
   // ==========================================================================
-  //  Retour
+  //  Retour du store
   // ==========================================================================
 
   return {
-    // État
+    // ========================================================================
+    //  État
+    // ========================================================================
     notifications,
     isLoading,
-    error,
+    stateError,
     lastUpdated,
     isPersisted,
 
-    // Getters
+    // ========================================================================
+    //  Getters
+    // ========================================================================
     total,
     unread,
     read,
@@ -598,14 +624,17 @@ export const useNotificationsStore = defineStore('notifications', () => {
     errors,
     warnings,
     infos,
-    system,
+    systemMessages,
     hasUnread,
     lastNotification,
 
-    // Actions principales
+    // ========================================================================
+    //  Actions principales
+    // ========================================================================
     add,
     success,
-    error,
+    showError,       // ⚠️ Renommé depuis `error`
+    errorFn: showError, // Alias pratique
     warning,
     info,
     system,
@@ -622,22 +651,28 @@ export const useNotificationsStore = defineStore('notifications', () => {
     cleanOldNotifications,
     showGlobal,
 
-    // Utilitaires
+    // ========================================================================
+    //  Utilitaires
+    // ========================================================================
     getIconForType,
     getByContext,
     getByDateRange,
     formatDate,
 
-    // Initialisation
+    // ========================================================================
+    //  Initialisation
+    // ========================================================================
     initialize,
 
-    // Constantes
-    NOTIFICATION_TYPES,
+    // ========================================================================
+    //  Constantes
+    // ========================================================================
+    NOTIFICATION_TYPES
   }
 })
 
 // ==========================================================================
-//  Export du store
+//  Export par défaut
 // ==========================================================================
 
 export default useNotificationsStore
