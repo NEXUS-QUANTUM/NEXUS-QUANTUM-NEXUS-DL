@@ -1,223 +1,368 @@
 // ==========================================================================
-//  NexusDL 2.0 - Nexus Theme
+//  NexusDL 2.0 - Nexus Theme (version complète et finale)
 //  Fichier : frontend/src/assets/styles/nexus-theme.scss
-//  Description : Variables, thèmes (sombre/clair) et mixins pour l'application
+//  Description : Variables CSS, thèmes (sombre/clair), mixins SCSS et
+//                utilitaires de thème pour toute l'application.
 //  Version : 2.0.0
+//  ⚠️ IMPORTANT :
+//  - Ce fichier NE DOIT PAS être importé via `additionalData` dans
+//    `vite.config.js` (sinon boucle infinie → "This file is already
+//    being loaded").
+//  - Il est importé explicitement dans `main.js` UNE SEULE FOIS.
+//  - Il NE DOIT PAS s'auto-importer ni importer global.scss.
 // ==========================================================================
 
 // --------------------------------------------------------------------------
-//  1. VARIABLES DU THÈME (DEFAULTS - Dark mode)
+//  1. VARIABLES DU THÈME PAR DÉFAUT (DARK MODE)
+//  Appliquées sur `:root` pour être accessibles partout.
 // --------------------------------------------------------------------------
 
 :root {
-  // --- Couleurs principales ---
+  // ========================================================================
+  //  Couleurs principales (accent)
+  // ========================================================================
   --color-primary: #00d4ff;
   --color-primary-dark: #0099cc;
   --color-primary-light: #66e5ff;
+  --color-primary-rgb: 0, 212, 255;
+
   --color-secondary: #0066ff;
   --color-secondary-dark: #0044cc;
   --color-secondary-light: #3399ff;
+  --color-secondary-rgb: 0, 102, 255;
 
-  // --- Couleurs d'état ---
+  // ========================================================================
+  //  Couleurs d'état (statuts)
+  // ========================================================================
   --color-success: #4caf50;
   --color-success-dark: #388e3c;
+  --color-success-light: #81c784;
+  --color-success-rgb: 76, 175, 80;
+
   --color-warning: #ff9800;
   --color-warning-dark: #f57c00;
+  --color-warning-light: #ffb74d;
+  --color-warning-rgb: 255, 152, 0;
+
   --color-error: #f44336;
   --color-error-dark: #c62828;
+  --color-error-light: #e57373;
+  --color-error-rgb: 244, 67, 54;
+
   --color-info: #2196f3;
   --color-info-dark: #1565c0;
+  --color-info-light: #64b5f6;
+  --color-info-rgb: 33, 150, 243;
 
-  // --- Fond et surface (dark) ---
+  --color-accent: #ff4081;
+  --color-accent-dark: #c60055;
+  --color-accent-light: #ff79b0;
+
+  // ========================================================================
+  //  Fonds (surfaces)
+  // ========================================================================
   --color-bg-primary: #0a0e1a;
   --color-bg-secondary: #141a2b;
   --color-bg-card: #1a2538;
   --color-bg-input: #1e2a40;
   --color-bg-hover: #253254;
+  --color-bg-active: #2d3c5f;
+  --color-bg-overlay: rgba(10, 14, 26, 0.85);
+  --color-bg-modal: rgba(0, 0, 0, 0.6);
+  --color-bg-tooltip: #253254;
 
-  // --- Texte (dark) ---
+  // ========================================================================
+  //  Textes
+  // ========================================================================
   --color-text-primary: #e8edf5;
   --color-text-secondary: #b0c0d8;
+  --color-text-tertiary: #8899b0;
   --color-text-muted: #6a7a9a;
+  --color-text-disabled: #4a5a72;
   --color-text-inverse: #0a0e1a;
+  --color-text-link: var(--color-primary);
+  --color-text-link-hover: var(--color-primary-light);
 
-  // --- Bordures ---
+  // ========================================================================
+  //  Bordures
+  // ========================================================================
   --color-border: #1a2538;
   --color-border-light: #253254;
-  --color-border-focus: #00d4ff;
+  --color-border-medium: #334566;
+  --color-border-strong: #4a5a72;
+  --color-border-focus: var(--color-primary);
+  --color-border-error: var(--color-error);
+  --color-border-success: var(--color-success);
 
-  // --- Ombres ---
+  // ========================================================================
+  //  Ombres
+  // ========================================================================
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+  --shadow-2xl: 0 24px 64px rgba(0, 0, 0, 0.7);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-focus: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+  --shadow-focus-error: 0 0 0 3px rgba(var(--color-error-rgb), 0.15);
 
-  // --- Typographie ---
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-size-base: 16px;
-  --font-size-sm: 0.875rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
+  // ========================================================================
+  //  Typographie
+  // ========================================================================
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo,
+    Courier, monospace;
+  --font-family-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --font-size-xs: 0.75rem;    // 12px
+  --font-size-sm: 0.875rem;   // 14px
+  --font-size-base: 1rem;     // 16px
+  --font-size-md: 1.0625rem;  // 17px
+  --font-size-lg: 1.125rem;   // 18px
+  --font-size-xl: 1.25rem;    // 20px
+  --font-size-2xl: 1.5rem;    // 24px
+  --font-size-3xl: 1.875rem;  // 30px
+  --font-size-4xl: 2.25rem;   // 36px
+  --font-size-5xl: 3rem;      // 48px
+
+  --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
 
-  // --- Rayons de bordure ---
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 1.8;
+
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+  --letter-spacing-widest: 0.1em;
+
+  // ========================================================================
+  //  Espacement
+  // ========================================================================
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;   // 4px
+  --spacing-2: 0.5rem;    // 8px
+  --spacing-3: 0.75rem;   // 12px
+  --spacing-4: 1rem;      // 16px
+  --spacing-5: 1.25rem;   // 20px
+  --spacing-6: 1.5rem;    // 24px
+  --spacing-7: 1.75rem;   // 28px
+  --spacing-8: 2rem;      // 32px
+  --spacing-10: 2.5rem;   // 40px
+  --spacing-12: 3rem;     // 48px
+  --spacing-16: 4rem;     // 64px
+  --spacing-20: 5rem;     // 80px
+  --spacing-24: 6rem;     // 96px
+
+  // ========================================================================
+  //  Rayons de bordure
+  // ========================================================================
+  --radius-none: 0;
+  --radius-xs: 2px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
   --radius-full: 9999px;
 
-  // --- Transitions ---
+  // ========================================================================
+  //  Transitions
+  // ========================================================================
+  --transition-none: none;
   --transition-fast: 150ms ease;
   --transition-base: 300ms ease;
   --transition-slow: 500ms ease;
+  --transition-slower: 700ms ease;
 
-  // --- Espacement ---
-  --spacing-1: 0.25rem;
-  --spacing-2: 0.5rem;
-  --spacing-3: 0.75rem;
-  --spacing-4: 1rem;
-  --spacing-6: 1.5rem;
-  --spacing-8: 2rem;
-  --spacing-12: 3rem;
+  --transition-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --transition-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --transition-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-  // --- Hauteur de ligne ---
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.5;
-  --line-height-loose: 1.8;
+  // ========================================================================
+  //  Z-index
+  // ========================================================================
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-toast: 9999;
 
-  // --- Largeurs max ---
+  // ========================================================================
+  //  Layout
+  // ========================================================================
   --max-width-container: 1200px;
   --max-width-content: 800px;
+  --max-width-narrow: 640px;
+  --max-width-wide: 1440px;
 
-  // --- Variables dérivées (pour compatibilité) ---
+  --header-height: 60px;
+  --footer-height: 60px;
+  --sidebar-width: 240px;
+
+  // ========================================================================
+  //  Aliases pour compatibilité
+  // ========================================================================
   --accent-primary: var(--color-primary);
+  --accent-primary-dark: var(--color-primary-dark);
   --accent-secondary: var(--color-secondary);
+
   --bg-primary: var(--color-bg-primary);
   --bg-secondary: var(--color-bg-secondary);
   --bg-card: var(--color-bg-card);
+  --bg-input: var(--color-bg-input);
+  --bg-hover: var(--color-bg-hover);
+
   --border-color: var(--color-border);
+  --border-color-light: var(--color-border-light);
+  --border-color-focus: var(--color-border-focus);
+
   --text-primary: var(--color-text-primary);
   --text-secondary: var(--color-text-secondary);
   --text-muted: var(--color-text-muted);
+  --text-inverse: var(--color-text-inverse);
+
+  --status-success: var(--color-success);
+  --status-warning: var(--color-warning);
+  --status-error: var(--color-error);
+  --status-info: var(--color-info);
+
+  --shadow-focus-primary: var(--shadow-focus);
 }
 
 // --------------------------------------------------------------------------
-//  2. THEME LIGHT (surcharge les variables)
+//  2. THÈME CLAIR (LIGHT MODE)
+//  Appliqué via la classe `.light-mode` sur <html> ou <body>.
 // --------------------------------------------------------------------------
 
 .light-mode {
+  // ========================================================================
+  //  Couleurs principales (ajustées pour le contraste sur fond clair)
+  // ========================================================================
+  --color-primary: #0066cc;
+  --color-primary-dark: #004d99;
+  --color-primary-light: #3399ff;
+  --color-primary-rgb: 0, 102, 204;
+
+  --color-secondary: #0044b3;
+  --color-secondary-dark: #003380;
+  --color-secondary-light: #3366cc;
+  --color-secondary-rgb: 0, 68, 179;
+
+  // ========================================================================
+  //  Couleurs d'état
+  // ========================================================================
+  --color-success: #2e7d32;
+  --color-success-dark: #1b5e20;
+  --color-success-light: #4caf50;
+  --color-success-rgb: 46, 125, 50;
+
+  --color-warning: #e65100;
+  --color-warning-dark: #bf360c;
+  --color-warning-light: #ff9800;
+  --color-warning-rgb: 230, 81, 0;
+
+  --color-error: #c62828;
+  --color-error-dark: #b71c1c;
+  --color-error-light: #e57373;
+  --color-error-rgb: 198, 40, 40;
+
+  --color-info: #0d47a1;
+  --color-info-dark: #002171;
+  --color-info-light: #2196f3;
+  --color-info-rgb: 13, 71, 161;
+
+  --color-accent: #d81b60;
+  --color-accent-dark: #ad1457;
+  --color-accent-light: #ec407a;
+
+  // ========================================================================
+  //  Fonds
+  // ========================================================================
   --color-bg-primary: #f4f6fa;
   --color-bg-secondary: #e9ecf2;
   --color-bg-card: #ffffff;
   --color-bg-input: #f0f2f5;
   --color-bg-hover: #e3e8ef;
+  --color-bg-active: #d8e0eb;
+  --color-bg-overlay: rgba(244, 246, 250, 0.85);
+  --color-bg-modal: rgba(0, 0, 0, 0.4);
+  --color-bg-tooltip: #2c3e50;
 
+  // ========================================================================
+  //  Textes
+  // ========================================================================
   --color-text-primary: #1a1a2e;
   --color-text-secondary: #3d4a5c;
+  --color-text-tertiary: #5a6a7e;
   --color-text-muted: #7a8a9a;
+  --color-text-disabled: #a8b4c0;
   --color-text-inverse: #ffffff;
 
+  // ========================================================================
+  //  Bordures
+  // ========================================================================
   --color-border: #d0d8e0;
   --color-border-light: #e3e8ef;
+  --color-border-medium: #b8c4d0;
+  --color-border-strong: #95a5b8;
+  --color-border-focus: var(--color-primary);
 
+  // ========================================================================
+  //  Ombres (plus subtiles sur fond clair)
+  // ========================================================================
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
-
-  // Couleurs principales adaptées pour meilleur contraste
-  --color-primary: #0066cc;
-  --color-primary-dark: #004d99;
-  --color-primary-light: #3399ff;
-  --color-secondary: #0044b3;
-  --color-secondary-dark: #003380;
-  --color-secondary-light: #3366cc;
-
-  // État
-  --color-success: #2e7d32;
-  --color-warning: #e65100;
-  --color-error: #c62828;
-  --color-info: #0d47a1;
-
-  // Redéfinir les alias
-  --accent-primary: var(--color-primary);
-  --accent-secondary: var(--color-secondary);
-  --bg-primary: var(--color-bg-primary);
-  --bg-secondary: var(--color-bg-secondary);
-  --bg-card: var(--color-bg-card);
-  --border-color: var(--color-border);
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-muted);
+  --shadow-2xl: 0 24px 64px rgba(0, 0, 0, 0.2);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-focus: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
+  --shadow-focus-error: 0 0 0 3px rgba(var(--color-error-rgb), 0.2);
 }
 
 // --------------------------------------------------------------------------
-//  3. UTILITAIRES (classes de thème)
+//  3. THÈME SOMBRE EXPLICITE (via .dark-mode)
+//  Utile pour forcer le mode sombre même si le système est en clair.
 // --------------------------------------------------------------------------
 
-// Appliquer le thème sur le body
 .dark-mode {
-  @extend :root;
-}
-
-// Classes pour les couleurs de texte
-.text-theme-primary {
-  color: var(--color-text-primary);
-}
-.text-theme-secondary {
-  color: var(--color-text-secondary);
-}
-.text-theme-muted {
-  color: var(--color-text-muted);
-}
-.text-theme-accent {
-  color: var(--color-primary);
-}
-
-// Classes pour les arrière-plans
-.bg-theme-primary {
-  background-color: var(--color-bg-primary);
-}
-.bg-theme-secondary {
-  background-color: var(--color-bg-secondary);
-}
-.bg-theme-card {
-  background-color: var(--color-bg-card);
-}
-.bg-theme-accent {
-  background-color: var(--color-primary);
-}
-.bg-theme-accent-light {
-  background-color: var(--color-primary-light);
-}
-
-// Classes pour les bordures
-.border-theme {
-  border-color: var(--color-border);
-}
-.border-theme-light {
-  border-color: var(--color-border-light);
-}
-.border-theme-accent {
-  border-color: var(--color-primary);
+  // Identique à `:root` (par défaut)
+  // On redéfinit ici pour permettre d'écraser un thème système clair.
+  // Aucune définition supplémentaire n'est nécessaire car `:root` est déjà en sombre.
 }
 
 // --------------------------------------------------------------------------
-//  4. MIXINS SCSS (pour utilisation dans les composants)
+//  4. MIXINS SCSS
+//  À utiliser dans les composants via `@include mixin-name(...)`.
 // --------------------------------------------------------------------------
 
-// Mixin pour les transitions de thème
-@mixin theme-transition($properties: all) {
-  transition: $properties var(--transition-base);
+// --- Transition de thème (pour le changement de couleur) ---
+@mixin theme-transition($properties: all, $duration: var(--transition-base)) {
+  transition: $properties $duration;
 }
 
-// Mixin pour les ombres
+// --- Ombre avec niveau ---
 @mixin shadow($level: md) {
-  @if $level == sm {
+  @if $level == xs {
+    box-shadow: var(--shadow-xs);
+  } @else if $level == sm {
     box-shadow: var(--shadow-sm);
   } @else if $level == md {
     box-shadow: var(--shadow-md);
@@ -225,176 +370,348 @@
     box-shadow: var(--shadow-lg);
   } @else if $level == xl {
     box-shadow: var(--shadow-xl);
+  } @else if $level == 2xl {
+    box-shadow: var(--shadow-2xl);
+  } @else if $level == inner {
+    box-shadow: var(--shadow-inner);
   } @else {
     box-shadow: var(--shadow-md);
   }
 }
 
-// Mixin pour les bordures
+// --- Bordure standard ---
 @mixin border($width: 1px, $style: solid, $color: var(--color-border)) {
   border: $width $style $color;
 }
 
-// Mixin pour le focus
-@mixin focus-ring($color: var(--color-primary), $width: 2px) {
+// --- Focus ring (accessibilité) ---
+@mixin focus-ring($color: var(--color-primary), $width: 2px, $offset: 2px) {
   &:focus-visible {
     outline: $width solid $color;
-    outline-offset: 2px;
+    outline-offset: $offset;
   }
 }
 
-// Mixin pour le texte avec ellipsis
+// --- Ellipsis (texte tronqué) ---
 @mixin text-ellipsis {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-// Mixin pour les cards
-@mixin card($padding: var(--spacing-4)) {
+// --- Multi-line ellipsis ---
+@mixin line-clamp($lines: 2) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// --- Card standard ---
+@mixin card($padding: var(--spacing-4), $radius: var(--radius-lg)) {
   background-color: var(--color-bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: $radius;
   @include border(1px, solid, var(--color-border));
   padding: $padding;
   @include shadow(md);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
+
   &:hover {
     border-color: var(--color-primary);
     @include shadow(lg);
   }
 }
 
-// Mixin pour les boutons
+// --- Bouton générique ---
 @mixin button-variant($bg: var(--color-primary), $text: var(--color-text-inverse)) {
   background-color: $bg;
   color: $text;
   border: none;
   border-radius: var(--radius-md);
-  padding: 0.5rem 1.25rem;
+  padding: var(--spacing-2) var(--spacing-5);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: background-color var(--transition-fast), transform var(--transition-fast);
-  &:hover {
-    background-color: darken($bg, 10%);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.1);
     transform: translateY(-1px);
   }
-  &:active {
+
+  &:active:not(:disabled) {
     transform: translateY(0);
   }
+
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
   }
+
   @include focus-ring();
 }
 
-// Mixin pour les inputs
-@mixin input-theme() {
+// --- Input standard ---
+@mixin input-theme {
   background-color: var(--color-bg-input);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 0.6rem 0.8rem;
+  padding: var(--spacing-2) var(--spacing-3);
   font-size: var(--font-size-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
   &:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb, 0, 212, 255), 0.15);
+    box-shadow: var(--shadow-focus);
+    outline: none;
   }
+
   &::placeholder {
     color: var(--color-text-muted);
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
-// Mixin pour les scrollbars
-@mixin custom-scrollbar($width: 8px, $thumb: var(--color-primary), $track: var(--color-bg-secondary)) {
+// --- Scrollbar personnalisée ---
+@mixin custom-scrollbar(
+  $width: 8px,
+  $thumb: var(--color-primary),
+  $track: var(--color-bg-secondary)
+) {
   &::-webkit-scrollbar {
     width: $width;
     height: $width;
   }
+
   &::-webkit-scrollbar-track {
     background: $track;
-    border-radius: $width / 2;
+    border-radius: calc($width / 2);
   }
+
   &::-webkit-scrollbar-thumb {
     background: $thumb;
-    border-radius: $width / 2;
+    border-radius: calc($width / 2);
+
     &:hover {
-      background: darken($thumb, 10%);
+      filter: brightness(1.2);
     }
   }
+
   // Firefox
   scrollbar-width: thin;
   scrollbar-color: $thumb $track;
 }
 
-// --------------------------------------------------------------------------
-//  5. THÈME DYNAMIQUE (pour les composants)
-// --------------------------------------------------------------------------
+// --- Focus visible global ---
+@mixin focus-visible($color: var(--color-primary)) {
+  &:focus-visible {
+    outline: 2px solid $color;
+    outline-offset: 2px;
+  }
+}
 
-// Variables CSS utilisables dans les composants
-:export {
-  // Couleurs
-  colorPrimary: var(--color-primary);
-  colorSecondary: var(--color-secondary);
-  colorSuccess: var(--color-success);
-  colorWarning: var(--color-warning);
-  colorError: var(--color-error);
-  colorInfo: var(--color-info);
-  // Fond
-  bgPrimary: var(--color-bg-primary);
-  bgSecondary: var(--color-bg-secondary);
-  bgCard: var(--color-bg-card);
-  // Texte
-  textPrimary: var(--color-text-primary);
-  textSecondary: var(--color-text-secondary);
-  textMuted: var(--color-text-muted);
-  // Bordures
-  border: var(--color-border);
-  // Ombres
-  shadowSm: var(--shadow-sm);
-  shadowMd: var(--shadow-md);
-  shadowLg: var(--shadow-lg);
-  // Radius
-  radiusSm: var(--radius-sm);
-  radiusMd: var(--radius-md);
-  radiusLg: var(--radius-lg);
-  radiusXl: var(--radius-xl);
-  // Transitions
-  transitionBase: var(--transition-base);
-  transitionFast: var(--transition-fast);
+// --- Conteneur flex ---
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// --- Grid responsive ---
+@mixin responsive-grid($min-width: 240px, $gap: var(--spacing-4)) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax($min-width, 1fr));
+  gap: $gap;
 }
 
 // --------------------------------------------------------------------------
-//  6. TOKENS DE DESIGN (pour référence)
+//  5. UTILITAIRES DE THÈME (classes prêtes à l'emploi)
 // --------------------------------------------------------------------------
 
-// Ces tokens sont disponibles pour être utilisés dans les fichiers SCSS
-$color-primary: var(--color-primary);
-$color-secondary: var(--color-secondary);
-$color-success: var(--color-success);
-$color-warning: var(--color-warning);
-$color-error: var(--color-error);
-$color-info: var(--color-info);
-$bg-primary: var(--color-bg-primary);
-$bg-secondary: var(--color-bg-secondary);
-$bg-card: var(--color-bg-card);
-$text-primary: var(--color-text-primary);
-$text-secondary: var(--color-text-secondary);
-$text-muted: var(--color-text-muted);
-$border-color: var(--color-border);
-$shadow-sm: var(--shadow-sm);
-$shadow-md: var(--shadow-md);
-$shadow-lg: var(--shadow-lg);
-$shadow-xl: var(--shadow-xl);
-$radius-sm: var(--radius-sm);
-$radius-md: var(--radius-md);
-$radius-lg: var(--radius-lg);
-$radius-xl: var(--radius-xl);
-$transition-base: var(--transition-base);
-$transition-fast: var(--transition-fast);
-$font-family: var(--font-family);
+// --- Couleurs de texte ---
+.text-theme-primary    { color: var(--color-text-primary); }
+.text-theme-secondary  { color: var(--color-text-secondary); }
+.text-theme-tertiary   { color: var(--color-text-tertiary); }
+.text-theme-muted      { color: var(--color-text-muted); }
+.text-theme-disabled   { color: var(--color-text-disabled); }
+.text-theme-inverse    { color: var(--color-text-inverse); }
+.text-theme-accent     { color: var(--color-primary); }
+.text-theme-success    { color: var(--color-success); }
+.text-theme-warning    { color: var(--color-warning); }
+.text-theme-error      { color: var(--color-error); }
+.text-theme-info       { color: var(--color-info); }
+
+// --- Arrière-plans ---
+.bg-theme-primary      { background-color: var(--color-bg-primary); }
+.bg-theme-secondary    { background-color: var(--color-bg-secondary); }
+.bg-theme-card         { background-color: var(--color-bg-card); }
+.bg-theme-input        { background-color: var(--color-bg-input); }
+.bg-theme-hover        { background-color: var(--color-bg-hover); }
+.bg-theme-active       { background-color: var(--color-bg-active); }
+.bg-theme-accent       { background-color: var(--color-primary); }
+.bg-theme-success      { background-color: var(--color-success); }
+.bg-theme-warning      { background-color: var(--color-warning); }
+.bg-theme-error        { background-color: var(--color-error); }
+.bg-theme-info         { background-color: var(--color-info); }
+
+// --- Bordures ---
+.border-theme          { border-color: var(--color-border); }
+.border-theme-light    { border-color: var(--color-border-light); }
+.border-theme-medium   { border-color: var(--color-border-medium); }
+.border-theme-strong   { border-color: var(--color-border-strong); }
+.border-theme-accent   { border-color: var(--color-primary); }
+.border-theme-success  { border-color: var(--color-success); }
+.border-theme-warning  { border-color: var(--color-warning); }
+.border-theme-error    { border-color: var(--color-error); }
+.border-theme-info     { border-color: var(--color-info); }
+
+// --- Ombres ---
+.shadow-theme-xs  { @include shadow(xs); }
+.shadow-theme-sm  { @include shadow(sm); }
+.shadow-theme-md  { @include shadow(md); }
+.shadow-theme-lg  { @include shadow(lg); }
+.shadow-theme-xl  { @include shadow(xl); }
+.shadow-theme-2xl { @include shadow(2xl); }
+.shadow-theme-none { box-shadow: none; }
+
+// --- Rayons ---
+.rounded-theme-sm   { border-radius: var(--radius-sm); }
+.rounded-theme-md   { border-radius: var(--radius-md); }
+.rounded-theme-lg   { border-radius: var(--radius-lg); }
+.rounded-theme-xl   { border-radius: var(--radius-xl); }
+.rounded-theme-2xl  { border-radius: var(--radius-2xl); }
+.rounded-theme-full { border-radius: var(--radius-full); }
+
+// --------------------------------------------------------------------------
+//  6. STYLES APPLIQUÉS AUX ÉLÉMENTS GLOBAUX
+// --------------------------------------------------------------------------
+
+// --- Application du fond au body ---
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+// --- Sélection de texte ---
+::selection {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+::-moz-selection {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+// --- Scrollbars globales ---
+html {
+  @include custom-scrollbar(8px, var(--color-border), var(--color-bg-secondary));
+}
+
+// --- Focus visible par défaut sur tous les éléments interactifs ---
+a,
+button,
+input,
+textarea,
+select,
+[tabindex]:not([tabindex='-1']) {
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+// --- Liens par défaut ---
+a {
+  color: var(--color-primary);
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: var(--color-primary-light);
+  }
+}
+
+// --------------------------------------------------------------------------
+//  7. STYLES POUR LES NAVIGATEURS (autofill, etc.)
+// --------------------------------------------------------------------------
+
+// --- Autofill Chrome/Safari ---
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-bg-input) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.light-mode input:-webkit-autofill,
+.light-mode textarea:-webkit-autofill,
+.light-mode select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-bg-input) inset;
+}
+
+// --- Respect de `prefers-reduced-motion` ---
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// --------------------------------------------------------------------------
+//  8. STYLES POUR LES ÉCRANS À HAUTE DENSITÉ (Retina)
+// --------------------------------------------------------------------------
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  // Images nettes, bordures fines, etc.
+  .hairline {
+    border-width: 0.5px;
+  }
+}
+
+// --------------------------------------------------------------------------
+//  9. PRINT (impression)
+// --------------------------------------------------------------------------
+
+@media print {
+  :root {
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #ffffff;
+    --color-bg-card: #ffffff;
+    --color-text-primary: #000000;
+    --color-text-secondary: #333333;
+    --color-border: #cccccc;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
 
 // ==========================================================================
 //  Fin de nexus-theme.scss
