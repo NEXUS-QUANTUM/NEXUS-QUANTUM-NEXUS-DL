@@ -805,21 +805,24 @@ $input-transition: all var(--transition-fast, 150ms) ease;
     color: var(--color-text-muted, #6a7a9a);
     opacity: 1;
   }
+}
 
-  // --- Textarea spécifique ---
-  textarea& {
-    resize: vertical;
-    min-height: 60px;
-  }
+// --- Textarea spécifique ---
+// NOTE : `textarea&` était invalide en SCSS ("&" doit être en début de
+// sélecteur composé). Sélecteur sorti du bloc imbriqué.
+textarea.nexus-input__field {
+  resize: vertical;
+  min-height: 60px;
+}
 
-  // --- Select spécifique ---
-  select& {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236a7a9a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.8rem center;
-    padding-right: 2.5rem;
-  }
+// --- Select spécifique ---
+// NOTE : idem pour `select&`.
+select.nexus-input__field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236a7a9a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  padding-right: 2.5rem;
 }
 
 // ==========================================================================
