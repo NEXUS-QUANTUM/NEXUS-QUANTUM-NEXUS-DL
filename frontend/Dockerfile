@@ -5,12 +5,6 @@
 #  Version : 2.0.0
 #  Architecture : Multi-stage (builder Node.js + production Nginx)
 #  Licence : GNU GPL v3.0
-#
-#  ⚠️ IMPORTANT :
-#  - Ce Dockerfile nécessite le fichier `nginx.conf` dans le même dossier.
-#  - Vite est une devDependency, il faut donc installer TOUTES les
-#    dépendances dans le builder (PAS de --omit=dev).
-#  - Ne pas utiliser `npm ci` si `package-lock.json` est absent.
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -19,9 +13,7 @@
 
 FROM node:20-alpine AS builder
 
-# --- Configuration de l'environnement ---
-# ⚠️ NODE_ENV=development : indispensable car Vite est une devDependency.
-#    Si on met NODE_ENV=production, npm ignore les devDependencies.
+# NODE_ENV=development est indispensable (Vite est une devDependency).
 ENV NODE_ENV=development \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_CACHE=/tmp/.npm-cache \
@@ -29,13 +21,11 @@ ENV NODE_ENV=development \
     NPM_CONFIG_FUND=false \
     CI=true
 
-# --- Arguments de build ---
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 ARG GIT_COMMIT=unknown
 ARG API_BACKEND_URL=/api
 
-# --- Métadonnées de l'image (builder) ---
 LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL Frontend (Builder)" \
       org.opencontainers.image.version="${VERSION}" \
@@ -44,39 +34,28 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.description="NexusDL 2.0 - Frontend Vue.js 3 (builder stage)" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
-# --- Installation des dépendances système minimales ---
-RUN apk add --no-cache \
-    curl \
-    ca-certificates \
-    git \
+RUN apk add --no-cache curl ca-certificates git \
     && rm -rf /var/cache/apk/*
 
-# --- Définir le répertoire de travail ---
 WORKDIR /app
 
-# --- Copier les fichiers de dépendances (cache Docker optimisé) ---
 COPY package.json package-lock.json* .npmrc* ./
 
-# --- Installer TOUTES les dépendances (prod + dev) ---
-# ✅ Utilisation de `npm install` (et non `npm ci`) car package-lock.json
-#    peut ne pas être présent dans le dépôt.
+# `npm install` (et non `npm ci`) car package-lock.json peut être absent.
 RUN npm install --no-audit --no-fund --no-progress \
     && npm cache clean --force \
     && rm -rf /tmp/.npm-cache
 
-# --- Copier le reste du code source ---
 COPY . .
 
-# --- Variables d'environnement pour le build Vite ---
 ENV VITE_API_BASE=/api \
     VITE_APP_VERSION=${VERSION} \
     VITE_API_BACKEND_URL=${API_BACKEND_URL} \
     VITE_BUILD_DATE=${BUILD_DATE}
 
-# --- Construire l'application ---
 RUN npm run build
 
-# --- Nettoyer les fichiers inutiles pour réduire la taille ---
+# Nettoyage : sourcemaps et dossiers vides
 RUN find dist -name "*.map" -type f -delete 2>/dev/null || true \
     && find dist -type d -empty -delete 2>/dev/null || true
 
@@ -86,12 +65,10 @@ RUN find dist -name "*.map" -type f -delete 2>/dev/null || true \
 
 FROM nginx:1.25-alpine AS production
 
-# --- Arguments de build ---
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 ARG GIT_COMMIT=unknown
 
-# --- Métadonnées de l'image finale ---
 LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL Frontend" \
       org.opencontainers.image.version="${VERSION}" \
@@ -101,47 +78,48 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/nexus-dl/nexus-dl"
 
-# --- Installation des utilitaires supplémentaires ---
-RUN apk add --no-cache \
-    curl \
-    tzdata \
-    && cp /usr/share/zoneinfo/Europe/Paris /etc/localtime \
-    && echo "Europe/Paris" > /etc/timezone \
-    && apk del tzdata
+# curl  : healthcheck
+# libcap: pour `setcap` (permet à nginx non-root de binder le port 80)
+RUN apk add --no-cache curl libcap \
+    && rm -rf /var/cache/apk/*
 
-# --- Créer un utilisateur non-root pour Nginx ---
-RUN addgroup -g 101 -S nginx 2>/dev/null || true \
-    && adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx 2>/dev/null || true
+# Fuseau horaire : copie directe, sans installer/désinstaller tzdata
+COPY --from=builder /usr/share/zoneinfo/Europe/Paris /etc/localtime
+RUN echo "Europe/Paris" > /etc/timezone
 
-# --- Copier la configuration Nginx personnalisée ---
+# Autoriser le binaire nginx à binder un port privilégié même lancé en USER nginx
+RUN setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx
+
+# NOTE : le user `nginx` (UID 101) existe déjà dans nginx:1.25-alpine.
+# Aucun adduser/addgroup nécessaire.
+
+# Configuration Nginx personnalisée
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# --- Copier les fichiers construits depuis le builder ---
+# Fichiers statiques construits
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
-# --- Créer les dossiers nécessaires et ajuster les permissions ---
-RUN mkdir -p /var/cache/nginx /var/log/nginx /var/run \
-    && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run \
-    && chmod -R 755 /var/cache/nginx /var/log/nginx \
-    && chmod -R 755 /usr/share/nginx/html \
+# Dossiers runtime + permissions
+# On ne chown PAS /var/run (symlink vers /run) : on chown uniquement le pid file.
+RUN mkdir -p /var/cache/nginx /var/log/nginx \
+    && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /usr/share/nginx/html \
+    && find /usr/share/nginx/html -type d -exec chmod 755 {} + \
+    && find /usr/share/nginx/html -type f -exec chmod 644 {} + \
     && touch /var/run/nginx.pid \
     && chown nginx:nginx /var/run/nginx.pid
 
-# --- Vérifier que la configuration Nginx est valide ---
+# Validation de la config Nginx
 RUN nginx -t
 
-# --- Utilisateur non-root ---
+# Utilisateur non-root + cap_net_bind_service
 USER nginx
 
-# --- Exposer les ports ---
 EXPOSE 80
 
-# --- Healthcheck pour Docker ---
 HEALTHCHECK --interval=30s \
             --timeout=10s \
             --start-period=15s \
             --retries=5 \
     CMD curl -f http://localhost/nginx-health || exit 1
 
-# --- Point d'entrée ---
 CMD ["nginx", "-g", "daemon off;"]
