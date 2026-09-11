@@ -1,8 +1,10 @@
 <!-- ==========================================================================
   NexusDL 2.0 - NexusButton Component
   Fichier : frontend/src/components/common/NexusButton.vue
-  Description : Composant de bouton ultra-complet (variantes, tailles, icônes, chargement, etc.)
+  Description : Composant de bouton ultra-complet (variantes, tailles, icônes,
+                chargement, badge, tooltip, router-link, block, etc.)
   Version : 2.0.0
+  Licence : GNU GPL v3.0
 ========================================================================== -->
 
 <template>
@@ -24,13 +26,16 @@
         'nexus-btn--uppercase': uppercase,
         'nexus-btn--with-icon': hasIcon,
         'nexus-btn--with-right-icon': hasRightIcon,
-      }
+        'nexus-btn--with-badge': !!badge,
+        'nexus-btn--active': active,
+        'nexus-btn--flat': flat,
+      },
     ]"
     :type="tag === 'button' ? type : undefined"
-    :disabled="disabled || loading"
+    :disabled="tag === 'button' ? disabled || loading : undefined"
     :aria-busy="loading"
     :aria-disabled="disabled || loading"
-    :aria-label="ariaLabel || label"
+    :aria-label="ariaLabel || (iconOnly ? label : undefined)"
     :tabindex="disabled || loading ? -1 : tabindex"
     :to="tag === 'router-link' ? to : undefined"
     :href="tag === 'a' ? href : undefined"
@@ -43,7 +48,7 @@
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
-    <!-- Indicateur de chargement (remplace le contenu si loading) -->
+    <!-- Contenu : loading OU contenu normal -->
     <template v-if="loading">
       <span class="nexus-btn__spinner" aria-hidden="true">
         <svg
@@ -64,122 +69,160 @@
       <span v-if="loadingText" class="nexus-btn__loading-text">
         {{ loadingText }}
       </span>
-      <span v-else class="nexus-btn__loading-text">
-        <slot name="loading">{{ defaultLoadingText }}</slot>
+      <span v-else-if="!iconOnly" class="nexus-btn__loading-text">
+        <slot name="loading">Chargement...</slot>
       </span>
     </template>
 
     <!-- Contenu normal -->
     <template v-else>
       <!-- Icône gauche -->
-      <span v-if="icon" class="nexus-btn__icon nexus-btn__icon--left" aria-hidden="true">
-        <component :is="icon" v-if="typeof icon === 'object'" />
-        <span v-else>{{ icon }}</span>
+      <span
+        v-if="hasIcon"
+        class="nexus-btn__icon nexus-btn__icon--left"
+        aria-hidden="true"
+      >
+        <slot name="icon">
+          <component :is="icon" v-if="typeof icon === 'object'" />
+          <span v-else>{{ icon }}</span>
+        </slot>
       </span>
 
       <!-- Texte / Slot principal -->
-      <span class="nexus-btn__text">
+      <span v-if="!iconOnly" class="nexus-btn__text">
         <slot>{{ label }}</slot>
       </span>
 
       <!-- Icône droite -->
-      <span v-if="rightIcon" class="nexus-btn__icon nexus-btn__icon--right" aria-hidden="true">
-        <component :is="rightIcon" v-if="typeof rightIcon === 'object'" />
-        <span v-else>{{ rightIcon }}</span>
+      <span
+        v-if="hasRightIcon"
+        class="nexus-btn__icon nexus-btn__icon--right"
+        aria-hidden="true"
+      >
+        <slot name="right-icon">
+          <component :is="rightIcon" v-if="typeof rightIcon === 'object'" />
+          <span v-else>{{ rightIcon }}</span>
+        </slot>
       </span>
     </template>
 
-    <!-- Badge optionnel (ex: compteur) -->
+    <!-- Badge (compteur) -->
     <span
       v-if="badge && !loading"
       class="nexus-btn__badge"
       :class="`nexus-btn__badge--${badgeVariant}`"
+      aria-hidden="true"
     >
-      {{ badge }}
+      {{ badge > maxBadge ? `${maxBadge}+` : badge }}
     </span>
 
-    <!-- Tooltip (via slot) -->
-    <span v-if="$slots.tooltip" class="nexus-btn__tooltip">
-      <slot name="tooltip" />
+    <!-- Tooltip natif -->
+    <span v-if="tooltip && !iconOnly" class="nexus-btn__tooltip" role="tooltip">
+      {{ tooltip }}
     </span>
   </component>
 </template>
 
 <script setup>
-import { computed, useSlots, ref } from 'vue'
+// ==========================================================================
+//  Imports
+// ==========================================================================
+
+import { computed, useSlots, ref, onMounted } from 'vue'
 
 // ==========================================================================
 //  Props
 // ==========================================================================
 
 const props = defineProps({
-  /** Variante du bouton */
+  /** Variante de couleur */
   variant: {
     type: String,
     default: 'primary',
     validator: (val) =>
-      ['primary', 'secondary', 'success', 'warning', 'error', 'info', 'neutral', 'dark', 'light'].includes(val),
+      [
+        'primary',
+        'secondary',
+        'success',
+        'warning',
+        'error',
+        'info',
+        'neutral',
+        'dark',
+        'light',
+        'ghost',
+      ].includes(val),
   },
-  /** Taille du bouton */
+  /** Taille */
   size: {
     type: String,
     default: 'md',
     validator: (val) => ['xs', 'sm', 'md', 'lg', 'xl'].includes(val),
   },
-  /** Type HTML (pour les boutons) */
+  /** Type HTML */
   type: {
     type: String,
     default: 'button',
     validator: (val) => ['button', 'submit', 'reset'].includes(val),
   },
-  /** Tag HTML à utiliser (button, a, router-link) */
+  /** Tag HTML */
   tag: {
     type: String,
     default: 'button',
-    validator: (val) => ['button', 'a', 'router-link', 'NuxtLink'].includes(val),
+    validator: (val) => ['button', 'a', 'router-link', 'div', 'span'].includes(val),
   },
-  /** Texte du bouton (utilisé si slot vide) */
+  /** Texte du bouton */
   label: {
     type: String,
     default: '',
   },
-  /** Icône à gauche (emoji, chaîne, ou composant) */
+  /** Icône à gauche */
   icon: {
     type: [String, Object],
     default: null,
   },
-  /** Icône à droite (emoji, chaîne, ou composant) */
+  /** Icône à droite */
   rightIcon: {
     type: [String, Object],
     default: null,
   },
-  /** Affiche uniquement l'icône (cache le texte) */
+  /** Icône seulement */
   iconOnly: {
     type: Boolean,
     default: false,
   },
-  /** Style contour (transparent avec bordure) */
+  /** Style outline */
   outline: {
     type: Boolean,
     default: false,
   },
-  /** Style ghost (transparent, pas de bordure) */
+  /** Style ghost (sans fond) */
   ghost: {
     type: Boolean,
     default: false,
   },
-  /** Style pilule (coins très arrondis) */
+  /** Style pilule */
   pill: {
     type: Boolean,
     default: false,
   },
-  /** Largeur pleine (block) */
+  /** Largeur pleine */
   block: {
     type: Boolean,
     default: false,
   },
-  /** Texte en majuscules */
+  /** Majuscules */
   uppercase: {
+    type: Boolean,
+    default: false,
+  },
+  /** Style plat (sans ombre) */
+  flat: {
+    type: Boolean,
+    default: false,
+  },
+  /** État actif */
+  active: {
     type: Boolean,
     default: false,
   },
@@ -188,15 +231,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Texte affiché pendant le chargement (si non spécifié, garde le texte normal) */
+  /** Texte pendant le chargement */
   loadingText: {
     type: String,
     default: '',
-  },
-  /** Texte par défaut pendant le chargement (si slot loading vide) */
-  defaultLoadingText: {
-    type: String,
-    default: 'Chargement...',
   },
   /** Désactivé */
   disabled: {
@@ -208,6 +246,11 @@ const props = defineProps({
     type: [String, Number],
     default: null,
   },
+  /** Maximum du badge */
+  maxBadge: {
+    type: Number,
+    default: 99,
+  },
   /** Variante du badge */
   badgeVariant: {
     type: String,
@@ -215,22 +258,22 @@ const props = defineProps({
     validator: (val) =>
       ['primary', 'success', 'warning', 'error', 'info', 'neutral'].includes(val),
   },
-  /** URL (pour tag="a") */
+  /** URL (tag="a") */
   href: {
     type: String,
     default: '',
   },
-  /** Target (pour tag="a") */
+  /** Target (tag="a") */
   target: {
     type: String,
     default: '_self',
   },
-  /** Rel (pour tag="a") */
+  /** Rel (tag="a") */
   rel: {
     type: String,
     default: '',
   },
-  /** To (pour router-link) */
+  /** To (tag="router-link") */
   to: {
     type: [String, Object],
     default: '',
@@ -245,7 +288,12 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  /** Couleur personnalisée (surcharge la variante) */
+  /** Tooltip (affiché en dessous) */
+  tooltip: {
+    type: String,
+    default: '',
+  },
+  /** Couleur personnalisée */
   customColor: {
     type: String,
     default: '',
@@ -255,7 +303,7 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  /** Bordures personnalisées */
+  /** Bordure personnalisée */
   customBorder: {
     type: String,
     default: '',
@@ -266,7 +314,13 @@ const props = defineProps({
 //  Émits
 // ==========================================================================
 
-const emit = defineEmits(['click', 'focus', 'blur', 'mouseenter', 'mouseleave'])
+const emit = defineEmits([
+  'click',
+  'focus',
+  'blur',
+  'mouseenter',
+  'mouseleave',
+])
 
 // ==========================================================================
 //  Slots
@@ -277,36 +331,31 @@ const hasIcon = computed(() => !!props.icon || !!slots.icon)
 const hasRightIcon = computed(() => !!props.rightIcon || !!slots['right-icon'])
 
 // ==========================================================================
-//  Référence
+//  Références
 // ==========================================================================
 
 const buttonRef = ref(null)
 
 // ==========================================================================
-//  Styles calculés
+//  Computed
 // ==========================================================================
 
 const customStyle = computed(() => {
   const style = {}
-  if (props.customColor) {
-    style.color = props.customColor
-  }
-  if (props.customBackground) {
-    style.backgroundColor = props.customBackground
-  }
-  if (props.customBorder) {
-    style.borderColor = props.customBorder
-  }
+  if (props.customColor) style.color = props.customColor
+  if (props.customBackground) style.backgroundColor = props.customBackground
+  if (props.customBorder) style.borderColor = props.customBorder
   return style
 })
 
 // ==========================================================================
-//  Gestionnaires d'événements
+//  Méthodes — Événements
 // ==========================================================================
 
 function handleClick(event) {
   if (props.disabled || props.loading) {
     event.preventDefault()
+    event.stopPropagation()
     return
   }
   emit('click', event)
@@ -329,7 +378,15 @@ function handleMouseLeave(event) {
 }
 
 // ==========================================================================
-//  Exposer la référence pour les méthodes natives (focus, etc.)
+//  Cycle de vie
+// ==========================================================================
+
+onMounted(() => {
+  // Rien à faire, préparation pour futures extensions
+})
+
+// ==========================================================================
+//  Exposition
 // ==========================================================================
 
 defineExpose({
@@ -342,17 +399,13 @@ defineExpose({
 
 <style lang="scss" scoped>
 // ==========================================================================
-//  Variables du composant
+//  Variables
 // ==========================================================================
 
 $btn-transition: all var(--transition-fast, 150ms) ease;
-$btn-radius-sm: var(--radius-sm, 4px);
-$btn-radius-md: var(--radius-md, 8px);
-$btn-radius-lg: var(--radius-lg, 12px);
-$btn-radius-full: var(--radius-full, 9999px);
 
 // ==========================================================================
-//  Styles du bouton
+//  Bouton principal
 // ==========================================================================
 
 .nexus-btn {
@@ -363,7 +416,7 @@ $btn-radius-full: var(--radius-full, 9999px);
   gap: 0.5rem;
   font-family: var(--font-family, inherit);
   font-weight: var(--font-weight-medium, 500);
-  line-height: 1.5;
+  line-height: 1.4;
   text-align: center;
   text-decoration: none;
   white-space: nowrap;
@@ -375,167 +428,177 @@ $btn-radius-full: var(--radius-full, 9999px);
   background: none;
   outline: none;
   vertical-align: middle;
-  min-width: 40px;
-  min-height: 40px;
+  overflow: hidden;
 
-  // --- Tailles ---
+  // ========================================================================
+  //  Tailles
+  // ========================================================================
+
   &--xs {
     padding: 0.15rem 0.5rem;
     font-size: 0.65rem;
-    border-radius: $btn-radius-sm;
+    border-radius: var(--radius-sm, 4px);
     min-height: 24px;
     min-width: 24px;
-    &.nexus-btn--pill {
-      border-radius: $btn-radius-full;
-    }
-    .nexus-btn__icon {
-      font-size: 0.7rem;
-    }
+    gap: 0.25rem;
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { font-size: 0.7rem; }
   }
 
   &--sm {
     padding: 0.3rem 0.8rem;
     font-size: 0.75rem;
-    border-radius: $btn-radius-sm;
+    border-radius: var(--radius-sm, 4px);
     min-height: 32px;
     min-width: 32px;
-    &.nexus-btn--pill {
-      border-radius: $btn-radius-full;
-    }
-    .nexus-btn__icon {
-      font-size: 0.8rem;
-    }
+    gap: 0.35rem;
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { font-size: 0.8rem; }
   }
 
   &--md {
     padding: 0.5rem 1.2rem;
     font-size: 0.9rem;
-    border-radius: $btn-radius-md;
+    border-radius: var(--radius-md, 8px);
     min-height: 40px;
     min-width: 40px;
-    &.nexus-btn--pill {
-      border-radius: $btn-radius-full;
-    }
-    .nexus-btn__icon {
-      font-size: 1rem;
-    }
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { font-size: 1rem; }
   }
 
   &--lg {
     padding: 0.65rem 1.6rem;
     font-size: 1rem;
-    border-radius: $btn-radius-lg;
+    border-radius: var(--radius-lg, 12px);
     min-height: 48px;
     min-width: 48px;
-    &.nexus-btn--pill {
-      border-radius: $btn-radius-full;
-    }
-    .nexus-btn__icon {
-      font-size: 1.1rem;
-    }
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { font-size: 1.15rem; }
   }
 
   &--xl {
-    padding: 0.8rem 2rem;
+    padding: 0.85rem 2rem;
     font-size: 1.1rem;
-    border-radius: $btn-radius-lg;
+    border-radius: var(--radius-lg, 12px);
     min-height: 56px;
     min-width: 56px;
-    &.nexus-btn--pill {
-      border-radius: $btn-radius-full;
-    }
-    .nexus-btn__icon {
-      font-size: 1.2rem;
-    }
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { font-size: 1.3rem; }
   }
 
-  // --- Variantes (remplissage) ---
+  // ========================================================================
+  //  Variantes (remplissage)
+  // ========================================================================
+
   &--primary {
     background-color: var(--color-primary, #00d4ff);
     color: var(--color-text-inverse, #0a0e1a);
     border-color: var(--color-primary, #00d4ff);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-primary-dark, #0099cc);
       border-color: var(--color-primary-dark, #0099cc);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(0, 212, 255, 0.2);
     }
   }
 
   &--secondary {
     background-color: var(--color-secondary, #0066ff);
-    color: var(--color-text-inverse, #ffffff);
+    color: #ffffff;
     border-color: var(--color-secondary, #0066ff);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-secondary-dark, #0044cc);
       border-color: var(--color-secondary-dark, #0044cc);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
 
   &--success {
     background-color: var(--color-success, #4caf50);
-    color: var(--color-text-inverse, #ffffff);
+    color: #ffffff;
     border-color: var(--color-success, #4caf50);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-success-dark, #388e3c);
       border-color: var(--color-success-dark, #388e3c);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
 
   &--warning {
     background-color: var(--color-warning, #ff9800);
-    color: var(--color-text-inverse, #0a0e1a);
+    color: #ffffff;
     border-color: var(--color-warning, #ff9800);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-warning-dark, #f57c00);
       border-color: var(--color-warning-dark, #f57c00);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
 
   &--error {
     background-color: var(--color-error, #f44336);
-    color: var(--color-text-inverse, #ffffff);
+    color: #ffffff;
     border-color: var(--color-error, #f44336);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-error-dark, #c62828);
       border-color: var(--color-error-dark, #c62828);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
 
   &--info {
     background-color: var(--color-info, #2196f3);
-    color: var(--color-text-inverse, #ffffff);
+    color: #ffffff;
     border-color: var(--color-info, #2196f3);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-info-dark, #1565c0);
       border-color: var(--color-info-dark, #1565c0);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
@@ -544,12 +607,15 @@ $btn-radius-full: var(--radius-full, 9999px);
     background-color: var(--color-bg-secondary, #141a2b);
     color: var(--color-text-secondary, #b0c0d8);
     border-color: var(--color-border, #1a2538);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-bg-hover, #253254);
       border-color: var(--color-border-light, #253254);
+      color: var(--color-text-primary, #e8edf5);
       transform: translateY(-1px);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
+
+    &:active:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       transform: translateY(0);
     }
   }
@@ -558,141 +624,126 @@ $btn-radius-full: var(--radius-full, 9999px);
     background-color: var(--color-bg-primary, #0a0e1a);
     color: var(--color-text-primary, #e8edf5);
     border-color: var(--color-border, #1a2538);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
       background-color: var(--color-bg-secondary, #141a2b);
       border-color: var(--color-border-light, #253254);
       transform: translateY(-1px);
     }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
-      transform: translateY(0);
-    }
   }
 
   &--light {
-    background-color: var(--color-bg-card, #ffffff);
+    background-color: #ffffff;
     color: var(--color-text-primary, #1a1a2e);
-    border-color: var(--color-border, #d0d8e0);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
-      background-color: var(--color-bg-secondary, #e9ecf2);
+    border-color: #d0d8e0;
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
+      background-color: #f4f6fa;
       transform: translateY(-1px);
-    }
-    &:active:not(:disabled):not(.nexus-btn--loading) {
-      transform: translateY(0);
     }
   }
 
-  // --- Outline ---
+  &--ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary, #b0c0d8);
+    border-color: transparent;
+
+    &:hover:not(:disabled):not(.nexus-btn--loading):not(.nexus-btn--disabled) {
+      background-color: var(--color-bg-hover, #253254);
+      color: var(--color-text-primary, #e8edf5);
+    }
+  }
+
+  // ========================================================================
+  //  Modificateurs
+  // ========================================================================
+
   &.nexus-btn--outline {
     background: transparent !important;
-    border-width: 1px;
+    border-width: 1.5px;
+
     &.nexus-btn--primary {
       color: var(--color-primary, #00d4ff);
       border-color: var(--color-primary, #00d4ff);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(0, 212, 255, 0.1);
+        background-color: rgba(0, 212, 255, 0.1) !important;
       }
     }
+
     &.nexus-btn--secondary {
       color: var(--color-secondary, #0066ff);
       border-color: var(--color-secondary, #0066ff);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(0, 102, 255, 0.1);
+        background-color: rgba(0, 102, 255, 0.1) !important;
       }
     }
+
     &.nexus-btn--success {
       color: var(--color-success, #4caf50);
       border-color: var(--color-success, #4caf50);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(76, 175, 80, 0.1);
+        background-color: rgba(76, 175, 80, 0.1) !important;
       }
     }
+
     &.nexus-btn--warning {
       color: var(--color-warning, #ff9800);
       border-color: var(--color-warning, #ff9800);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(255, 152, 0, 0.1);
+        background-color: rgba(255, 152, 0, 0.1) !important;
       }
     }
+
     &.nexus-btn--error {
       color: var(--color-error, #f44336);
       border-color: var(--color-error, #f44336);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(244, 67, 54, 0.1);
+        background-color: rgba(244, 67, 54, 0.1) !important;
       }
     }
+
     &.nexus-btn--info {
       color: var(--color-info, #2196f3);
       border-color: var(--color-info, #2196f3);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(33, 150, 243, 0.1);
+        background-color: rgba(33, 150, 243, 0.1) !important;
       }
     }
+
     &.nexus-btn--neutral {
       color: var(--color-text-secondary, #b0c0d8);
       border-color: var(--color-border, #1a2538);
       &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: var(--color-bg-hover, #253254);
+        background-color: var(--color-bg-hover, #253254) !important;
+        color: var(--color-text-primary, #e8edf5);
       }
     }
   }
 
-  // --- Ghost ---
   &.nexus-btn--ghost {
     background: transparent !important;
     border-color: transparent !important;
-    color: var(--color-text-secondary, #b0c0d8);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
-      background-color: var(--color-bg-hover, #253254);
-      color: var(--color-text-primary, #e8edf5);
-    }
-    &.nexus-btn--primary {
-      color: var(--color-primary, #00d4ff);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(0, 212, 255, 0.1);
-      }
-    }
-    &.nexus-btn--secondary {
-      color: var(--color-secondary, #0066ff);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(0, 102, 255, 0.1);
-      }
-    }
-    &.nexus-btn--success {
-      color: var(--color-success, #4caf50);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(76, 175, 80, 0.1);
-      }
-    }
-    &.nexus-btn--warning {
-      color: var(--color-warning, #ff9800);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(255, 152, 0, 0.1);
-      }
-    }
-    &.nexus-btn--error {
-      color: var(--color-error, #f44336);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(244, 67, 54, 0.1);
-      }
-    }
-    &.nexus-btn--info {
-      color: var(--color-info, #2196f3);
-      &:hover:not(:disabled):not(.nexus-btn--loading) {
-        background-color: rgba(33, 150, 243, 0.1);
-      }
-    }
   }
 
-  // --- États ---
-  &--block {
+  &.nexus-btn--block {
     display: flex;
     width: 100%;
     justify-content: center;
   }
 
-  &--uppercase {
+  &.nexus-btn--uppercase {
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+
+  &.nexus-btn--active {
+    background-color: var(--color-primary, #00d4ff);
+    color: var(--color-text-inverse, #0a0e1a);
+    border-color: var(--color-primary, #00d4ff);
+  }
+
+  &.nexus-btn--flat {
+    box-shadow: none !important;
   }
 
   &--disabled,
@@ -700,56 +751,99 @@ $btn-radius-full: var(--radius-full, 9999px);
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
   }
 
   &--loading {
     cursor: wait;
     pointer-events: none;
+
     .nexus-btn__text,
-    .nexus-btn__icon {
-      opacity: 0.5;
+    .nexus-btn__icon,
+    .nexus-btn__loading-text {
+      opacity: 0.75;
     }
   }
+
+  // ========================================================================
+  //  Icon only
+  // ========================================================================
 
   &--icon-only {
     padding: 0;
-    min-width: 0;
-    width: auto;
-    justify-content: center;
-    .nexus-btn__text {
-      display: none;
-    }
-    &.nexus-btn--xs {
-      width: 24px;
-      height: 24px;
-      padding: 0;
-    }
-    &.nexus-btn--sm {
-      width: 32px;
-      height: 32px;
-      padding: 0;
-    }
-    &.nexus-btn--md {
-      width: 40px;
-      height: 40px;
-      padding: 0;
-    }
-    &.nexus-btn--lg {
-      width: 48px;
-      height: 48px;
-      padding: 0;
-    }
-    &.nexus-btn--xl {
-      width: 56px;
-      height: 56px;
-      padding: 0;
-    }
-    .nexus-btn__icon {
-      margin: 0;
-    }
+
+    &.nexus-btn--xs { width: 24px; height: 24px; }
+    &.nexus-btn--sm { width: 32px; height: 32px; }
+    &.nexus-btn--md { width: 40px; height: 40px; }
+    &.nexus-btn--lg { width: 48px; height: 48px; }
+    &.nexus-btn--xl { width: 56px; height: 56px; }
+
+    &.nexus-btn--pill { border-radius: var(--radius-full, 9999px); }
+
+    .nexus-btn__icon { margin: 0; }
   }
 
-  // --- Badge ---
+  // ========================================================================
+  //  Éléments internes
+  // ========================================================================
+
+  &__text {
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+
+    &--left { margin-right: 0.1rem; }
+    &--right { margin-left: 0.1rem; }
+  }
+
+  &.nexus-btn--icon-only &__icon { margin: 0; }
+
+  // ========================================================================
+  //  Spinner
+  // ========================================================================
+
+  &__spinner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+    animation: nexusBtnSpin 0.8s linear infinite;
+  }
+
+  &__spinner-icon {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__spinner-path {
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: 0;
+    animation: nexusBtnSpinnerDash 1.5s ease-in-out infinite;
+  }
+
+  &__loading-text {
+    display: inline-block;
+  }
+
+  // ========================================================================
+  //  Badge
+  // ========================================================================
+
   &__badge {
     position: absolute;
     top: -6px;
@@ -764,8 +858,6 @@ $btn-radius-full: var(--radius-full, 9999px);
     font-weight: var(--font-weight-bold, 700);
     border-radius: var(--radius-full, 9999px);
     line-height: 1;
-    background-color: var(--color-error, #f44336);
-    color: var(--color-text-inverse, #ffffff);
     border: 2px solid var(--color-bg-primary, #0a0e1a);
     pointer-events: none;
 
@@ -773,22 +865,27 @@ $btn-radius-full: var(--radius-full, 9999px);
       background-color: var(--color-primary, #00d4ff);
       color: var(--color-text-inverse, #0a0e1a);
     }
+
     &--success {
       background-color: var(--color-success, #4caf50);
-      color: var(--color-text-inverse, #ffffff);
+      color: #ffffff;
     }
+
     &--warning {
       background-color: var(--color-warning, #ff9800);
-      color: var(--color-text-inverse, #0a0e1a);
+      color: #ffffff;
     }
+
     &--error {
       background-color: var(--color-error, #f44336);
-      color: var(--color-text-inverse, #ffffff);
+      color: #ffffff;
     }
+
     &--info {
       background-color: var(--color-info, #2196f3);
-      color: var(--color-text-inverse, #ffffff);
+      color: #ffffff;
     }
+
     &--neutral {
       background-color: var(--color-bg-secondary, #141a2b);
       color: var(--color-text-secondary, #b0c0d8);
@@ -796,59 +893,18 @@ $btn-radius-full: var(--radius-full, 9999px);
     }
   }
 
-  // --- Icônes ---
-  &__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+  // ========================================================================
+  //  Tooltip natif (title)
+  // ========================================================================
 
-    &--left {
-      margin-right: 0.1rem;
-    }
-    &--right {
-      margin-left: 0.1rem;
-    }
-  }
-
-  &.nexus-btn--icon-only &__icon {
-    margin: 0;
-  }
-
-  // --- Spinner ---
-  &__spinner {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.2em;
-    height: 1.2em;
-    flex-shrink: 0;
-    animation: nexus-btn-spin 0.8s linear infinite;
-  }
-
-  &__spinner-icon {
-    width: 100%;
-    height: 100%;
-  }
-
-  &__spinner-path {
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-dasharray: 90, 150;
-    stroke-dashoffset: 0;
-    animation: nexus-btn-spinner-dash 1.5s ease-in-out infinite;
-  }
-
-  &__loading-text {
-    margin-left: 0.3rem;
-  }
-
-  // --- Tooltip ---
   &__tooltip {
     display: none;
   }
 
-  // --- Focus ---
+  // ========================================================================
+  //  Focus
+  // ========================================================================
+
   &:focus-visible {
     outline: 2px solid var(--color-primary, #00d4ff);
     outline-offset: 2px;
@@ -859,13 +915,11 @@ $btn-radius-full: var(--radius-full, 9999px);
 //  Animations
 // ==========================================================================
 
-@keyframes nexus-btn-spin {
-  100% {
-    transform: rotate(360deg);
-  }
+@keyframes nexusBtnSpin {
+  100% { transform: rotate(360deg); }
 }
 
-@keyframes nexus-btn-spinner-dash {
+@keyframes nexusBtnSpinnerDash {
   0% {
     stroke-dasharray: 1, 150;
     stroke-dashoffset: 0;
@@ -881,27 +935,76 @@ $btn-radius-full: var(--radius-full, 9999px);
 }
 
 // ==========================================================================
-//  Support du thème sombre/clair (déjà géré via variables CSS)
+//  Support du thème clair
 // ==========================================================================
 
-.dark-mode .nexus-btn {
-  &--light {
-    background-color: var(--color-bg-card, #1a2538);
-    color: var(--color-text-primary, #e8edf5);
-    border-color: var(--color-border, #1a2538);
-    &:hover:not(:disabled):not(.nexus-btn--loading) {
-      background-color: var(--color-bg-secondary, #141a2b);
+.light-mode {
+  .nexus-btn {
+    &--neutral {
+      background-color: #e9ecf2;
+      color: var(--color-text-secondary, #3d4a5c);
+      border-color: #d0d8e0;
+
+      &:hover:not(:disabled):not(.nexus-btn--loading) {
+        background-color: #e3e8ef;
+        color: var(--color-text-primary, #1a1a2e);
+      }
+    }
+
+    &--dark {
+      background-color: #1a1a2e;
+      color: #ffffff;
+      border-color: #1a1a2e;
+
+      &:hover:not(:disabled):not(.nexus-btn--loading) {
+        background-color: #2a2a3e;
+      }
+    }
+
+    &--light {
+      background-color: #ffffff;
+      color: var(--color-text-primary, #1a1a2e);
+      border-color: #d0d8e0;
+
+      &:hover:not(:disabled):not(.nexus-btn--loading) {
+        background-color: #f4f6fa;
+      }
+    }
+
+    &--ghost {
+      &:hover:not(:disabled):not(.nexus-btn--loading) {
+        background-color: #e3e8ef;
+        color: var(--color-text-primary, #1a1a2e);
+      }
+    }
+
+    &__badge {
+      border-color: #ffffff;
+
+      &--neutral {
+        background-color: #e9ecf2;
+        color: var(--color-text-secondary, #3d4a5c);
+        border-color: #d0d8e0;
+      }
     }
   }
 }
 
-.light-mode .nexus-btn {
-  &--dark {
-    background-color: var(--color-bg-secondary, #e9ecf2);
-    color: var(--color-text-primary, #1a1a2e);
-    border-color: var(--color-border, #d0d8e0);
+// ==========================================================================
+//  Réduction des animations
+// ==========================================================================
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-btn {
+    transition: none !important;
+
     &:hover:not(:disabled):not(.nexus-btn--loading) {
-      background-color: var(--color-bg-card, #ffffff);
+      transform: none !important;
+    }
+
+    &__spinner,
+    &__spinner-path {
+      animation: none !important;
     }
   }
 }
