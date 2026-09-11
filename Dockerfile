@@ -1,9 +1,7 @@
 # ==========================================================================
 #  NexusDL 2.0 - Root Dockerfile (backend + frontend combinés)
 #  Fichier : Dockerfile (à la racine du projet)
-#  Description : Image unique contenant FastAPI + Vue.js 3 + Nginx
-#  Version : 2.0.0
-#  Licence : GNU GPL v3.0
+#  Version : 2.0.0-debug
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -75,7 +73,7 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.build-date="${BUILD_DATE}" \
-      org.opencontainers.image.description="NexusDL 2.0 - Moteur universel de téléchargement de scans" \
+      org.opencontainers.image.description="NexusDL 2.0" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -119,7 +117,9 @@ COPY --from=builder-python /ms-playwright /ms-playwright
 WORKDIR /app
 COPY backend/app ./app
 
-COPY .env* ./
+# NOTE : la ligne `COPY .env* ./` a été retirée.
+# Elle faisait échouer le build quand aucun fichier .env n'existe à la racine.
+# Sur Render, les variables d'environnement sont fournies par le dashboard.
 
 COPY --from=builder-node /build/dist /var/www/html
 
@@ -219,7 +219,7 @@ server {
 EOF
 
 # ==========================================================================
-#  CONFIGURATION SUPERVISOR (inline, conservée pour référence)
+#  CONFIGURATION SUPERVISOR (inline, conservée pour plus tard)
 # ==========================================================================
 
 RUN cat > /etc/supervisor/conf.d/nexusdl.conf << 'EOF'
@@ -261,10 +261,11 @@ RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
 
 RUN nginx -t
 
+# Render fournit $PORT — on écoute dessus si défini, sinon 8000.
 EXPOSE 8000
 
-# ⚠️ TEMPORAIRE — MODE DEBUG
-# On court-circuite supervisor pour voir la stacktrace dans les logs Render.
-# Uvicorn démarre directement et toute erreur Python remonte dans stdout.
-# Une fois le bug identifié, on remettra la ligne CMD supervisor d'origine.
-CMD ["sh", "-c", "cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug"]
+# ⚠️ MODE DEBUG TEMPORAIRE
+# Supervisor est court-circuité pour voir la stacktrace dans les logs Render.
+# Une fois le bug corrigé, on remettra :
+#   CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+CMD ["sh", "-c", "cd /app && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level debug"]
