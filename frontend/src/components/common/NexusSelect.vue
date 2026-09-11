@@ -1,12 +1,16 @@
 <!-- ==========================================================================
   NexusDL 2.0 - NexusSelect Component
   Fichier : frontend/src/components/common/NexusSelect.vue
-  Description : Composant de sélection ultra-complet (simple/multiple, recherche, groupes, etc.)
+  Description : Composant de sélection ultra-complet (simple/multiple,
+                recherche, groupes, tags, chargement, etc.)
   Version : 2.0.0
+  Licence : GNU GPL v3.0
+  ⚠️ CORRECTION : `sticky;` → `position: sticky;` (ligne ~504)
 ========================================================================== -->
 
 <template>
   <div
+    ref="wrapperRef"
     class="nexus-select-wrapper"
     :class="[
       `nexus-select-wrapper--${size}`,
@@ -24,12 +28,13 @@
         'nexus-select-wrapper--multiple': multiple,
         'nexus-select-wrapper--clearable': clearable && hasValue,
         'nexus-select-wrapper--searchable': searchable,
-      }
+      },
     ]"
     :style="customStyle"
-    ref="wrapperRef"
   >
-    <!-- Label -->
+    <!-- ==================================================================
+      LABEL
+    =================================================================== -->
     <label
       v-if="label"
       :for="id"
@@ -37,14 +42,20 @@
       :class="{ 'nexus-select__label--required': required }"
     >
       {{ label }}
-      <span v-if="required" class="nexus-select__label-required" aria-hidden="true">*</span>
+      <span
+        v-if="required"
+        class="nexus-select__label-required"
+        aria-hidden="true"
+      >
+        *
+      </span>
     </label>
 
-    <!-- Champ de sélection -->
+    <!-- ==================================================================
+      CONTRÔLE
+    =================================================================== -->
     <div
       class="nexus-select__control"
-      @click="toggleDropdown"
-      @keydown="handleKeyDown"
       role="combobox"
       :aria-expanded="isOpen"
       :aria-controls="`${id}-listbox`"
@@ -53,12 +64,18 @@
       :aria-invalid="!!error"
       :aria-disabled="disabled"
       :aria-required="required"
-      :aria-activedescendant="highlightedIndex >= 0 ? `${id}-option-${highlightedIndex}` : undefined"
-      tabindex="0"
+      :aria-activedescendant="
+        highlightedIndex >= 0 ? `${id}-option-${highlightedIndex}` : undefined
+      "
+      :tabindex="disabled ? -1 : 0"
+      @click="toggleDropdown"
+      @keydown="handleKeyDown"
+      @focus="isFocused = true"
+      @blur="isFocused = false"
     >
-      <!-- Affichage des valeurs sélectionnées -->
+      <!-- Conteneur des valeurs -->
       <div class="nexus-select__value-container">
-        <!-- Mode multiple : afficher les tags -->
+        <!-- Mode multiple : tags -->
         <template v-if="multiple && selectedItems.length">
           <span
             v-for="item in selectedItems"
@@ -71,16 +88,16 @@
             <button
               type="button"
               class="nexus-select__tag-remove"
+              :aria-label="`Retirer ${item.label}`"
               @mousedown.prevent
               @click.stop="removeItem(item)"
-              :aria-label="`Retirer ${item.label}`"
             >
               <span aria-hidden="true">&times;</span>
             </button>
           </span>
         </template>
 
-        <!-- Mode simple : afficher le label sélectionné ou placeholder -->
+        <!-- Mode simple : valeur sélectionnée -->
         <span
           v-else-if="selectedItems.length === 1"
           class="nexus-select__single-value"
@@ -89,29 +106,26 @@
         </span>
 
         <!-- Placeholder -->
-        <span
-          v-else
-          class="nexus-select__placeholder"
-        >
+        <span v-else class="nexus-select__placeholder">
           {{ placeholder || 'Sélectionnez une option' }}
         </span>
 
-        <!-- Champ de recherche (si searchable) -->
+        <!-- Champ de recherche -->
         <input
           v-if="searchable"
           ref="searchInputRef"
+          v-model="searchQuery"
           type="text"
           class="nexus-select__search-input"
           :placeholder="searchPlaceholder || 'Rechercher...'"
-          v-model="searchQuery"
-          @input="handleSearchInput"
-          @focus="handleSearchFocus"
-          @blur="handleSearchBlur"
-          @keydown.stop="handleSearchKeydown"
           :disabled="disabled"
           :aria-label="`Rechercher dans ${label || 'les options'}`"
           autocomplete="off"
           spellcheck="false"
+          @input="handleSearchInput"
+          @focus="handleSearchFocus"
+          @blur="handleSearchBlur"
+          @keydown.stop="handleSearchKeydown"
         />
       </div>
 
@@ -135,12 +149,20 @@
           </svg>
         </span>
 
-        <!-- Statut succès/erreur -->
-        <span v-if="success" class="nexus-select__status nexus-select__status--success" aria-hidden="true">
-          <span>✓</span>
+        <!-- Statuts succès/erreur -->
+        <span
+          v-if="success"
+          class="nexus-select__status nexus-select__status--success"
+          aria-hidden="true"
+        >
+          ✓
         </span>
-        <span v-if="error" class="nexus-select__status nexus-select__status--error" aria-hidden="true">
-          <span>✕</span>
+        <span
+          v-if="error"
+          class="nexus-select__status nexus-select__status--error"
+          aria-hidden="true"
+        >
+          ✕
         </span>
 
         <!-- Bouton d'effacement -->
@@ -148,14 +170,14 @@
           v-if="clearable && hasValue && !disabled"
           type="button"
           class="nexus-select__clear"
+          aria-label="Effacer la sélection"
           @mousedown.prevent
           @click.stop="clearValue"
-          aria-label="Effacer la sélection"
         >
           <span aria-hidden="true">&times;</span>
         </button>
 
-        <!-- Flèche d'ouverture -->
+        <!-- Flèche -->
         <span class="nexus-select__arrow" aria-hidden="true">
           <svg
             viewBox="0 0 12 8"
@@ -171,7 +193,9 @@
       </div>
     </div>
 
-    <!-- Helper / Error -->
+    <!-- ==================================================================
+      HELPER / ERROR
+    =================================================================== -->
     <div v-if="hasHelper" class="nexus-select__helper">
       <span v-if="error" class="nexus-select__error-message" role="alert">
         {{ error }}
@@ -181,7 +205,9 @@
       </span>
     </div>
 
-    <!-- Dropdown -->
+    <!-- ==================================================================
+      DROPDOWN (teleporté)
+    =================================================================== -->
     <Teleport to="body">
       <Transition
         name="nexus-select-dropdown"
@@ -197,29 +223,32 @@
           :class="[
             `nexus-select__dropdown--${size}`,
             {
-              'nexus-select__dropdown--scrollable': filteredOptions.length > 10,
-            }
+              'nexus-select__dropdown--scrollable':
+                filteredOptions.length > 10,
+            },
           ]"
-          :style="dropdownStyle"
           role="listbox"
           :aria-label="`Options pour ${label || 'sélection'}`"
           @mousedown.stop
         >
-          <!-- Message de chargement -->
+          <!-- Chargement -->
           <div v-if="loading" class="nexus-select__empty">
             <slot name="loading">
               <span class="nexus-select__empty-text">Chargement...</span>
             </slot>
           </div>
 
-          <!-- Pas de résultats -->
-          <div v-else-if="filteredOptions.length === 0" class="nexus-select__empty">
+          <!-- Aucun résultat -->
+          <div
+            v-else-if="filteredOptions.length === 0"
+            class="nexus-select__empty"
+          >
             <slot name="empty">
               <span class="nexus-select__empty-text">{{ noResultsText }}</span>
             </slot>
           </div>
 
-          <!-- Liste des options -->
+          <!-- Liste -->
           <template v-else>
             <!-- Options groupées -->
             <template v-if="groupedOptions.length > 0">
@@ -228,16 +257,20 @@
                 :key="group.group || `group-${groupIndex}`"
                 class="nexus-select__option-group"
               >
-                <div v-if="group.group" class="nexus-select__option-group-label">
+                <div
+                  v-if="group.group"
+                  class="nexus-select__option-group-label"
+                >
                   {{ group.group }}
                 </div>
                 <div
-                  v-for="(option, optionIndex) in group.options"
-                  :key="option.value"
+                  v-for="option in group.options"
                   :id="`${id}-option-${getOptionIndex(option)}`"
+                  :key="option.value"
                   class="nexus-select__option"
                   :class="{
-                    'nexus-select__option--highlighted': getOptionIndex(option) === highlightedIndex,
+                    'nexus-select__option--highlighted':
+                      getOptionIndex(option) === highlightedIndex,
                     'nexus-select__option--selected': isSelected(option),
                     'nexus-select__option--disabled': option.disabled,
                   }"
@@ -248,10 +281,20 @@
                   @mouseenter="highlightOption(getOptionIndex(option))"
                 >
                   <slot name="option" :option="option">
-                    <span v-if="multiple" class="nexus-select__option-checkbox">
-                      <span v-if="isSelected(option)" class="nexus-select__option-checkmark">✓</span>
+                    <span
+                      v-if="multiple"
+                      class="nexus-select__option-checkbox"
+                    >
+                      <span
+                        v-if="isSelected(option)"
+                        class="nexus-select__option-checkmark"
+                      >
+                        ✓
+                      </span>
                     </span>
-                    <span class="nexus-select__option-label">{{ option.label }}</span>
+                    <span class="nexus-select__option-label">
+                      {{ option.label }}
+                    </span>
                   </slot>
                 </div>
               </div>
@@ -260,8 +303,8 @@
             <!-- Options non groupées -->
             <div
               v-for="(option, index) in filteredOptions"
-              :key="option.value"
               :id="`${id}-option-${index}`"
+              :key="option.value"
               class="nexus-select__option"
               :class="{
                 'nexus-select__option--highlighted': index === highlightedIndex,
@@ -276,9 +319,16 @@
             >
               <slot name="option" :option="option">
                 <span v-if="multiple" class="nexus-select__option-checkbox">
-                  <span v-if="isSelected(option)" class="nexus-select__option-checkmark">✓</span>
+                  <span
+                    v-if="isSelected(option)"
+                    class="nexus-select__option-checkmark"
+                  >
+                    ✓
+                  </span>
                 </span>
-                <span class="nexus-select__option-label">{{ option.label }}</span>
+                <span class="nexus-select__option-label">
+                  {{ option.label }}
+                </span>
               </slot>
             </div>
           </template>
@@ -289,14 +339,25 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, useSlots } from 'vue'
+// ==========================================================================
+//  Imports
+// ==========================================================================
+
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick,
+} from 'vue'
 
 // ==========================================================================
 //  Props
 // ==========================================================================
 
 const props = defineProps({
-  /** Identifiant du champ */
+  /** Identifiant unique (auto-généré si non fourni) */
   id: {
     type: String,
     default: () => `nexus-select-${Math.random().toString(36).slice(2, 7)}`,
@@ -311,17 +372,17 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  /** Placeholder pour la recherche */
+  /** Placeholder de la recherche */
   searchPlaceholder: {
     type: String,
     default: '',
   },
-  /** Valeur liée (v-model) - string pour single, array pour multiple */
+  /** Valeur liée (v-model) */
   modelValue: {
     type: [String, Number, Array],
-    default: () => ([]),
+    default: () => [],
   },
-  /** Options disponibles : [{ value: string|number, label: string, group?: string, disabled?: boolean }] */
+  /** Options : [{ value, label, group?, disabled? }] */
   options: {
     type: Array,
     default: () => [],
@@ -336,7 +397,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Afficher un bouton pour effacer la sélection */
+  /** Afficher un bouton pour effacer */
   clearable: {
     type: Boolean,
     default: false,
@@ -366,18 +427,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Requis (affiche une étoile) */
+  /** Requis */
   required: {
     type: Boolean,
     default: false,
   },
-  /** Taille du champ */
+  /** Taille */
   size: {
     type: String,
     default: 'md',
     validator: (val) => ['sm', 'md', 'lg'].includes(val),
   },
-  /** Largeur pleine (block) */
+  /** Largeur pleine */
   block: {
     type: Boolean,
     default: true,
@@ -387,7 +448,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Label ARIA personnalisé */
+  /** Label ARIA */
   ariaLabel: {
     type: String,
     default: '',
@@ -430,19 +491,23 @@ const emit = defineEmits([
 ])
 
 // ==========================================================================
-//  Slots
+//  Computed — Aides
 // ==========================================================================
 
-const slots = useSlots()
 const hasHelper = computed(() => !!props.helper || !!props.error)
 
 // ==========================================================================
-//  Références et état
+//  Références DOM
 // ==========================================================================
 
 const wrapperRef = ref(null)
 const dropdownRef = ref(null)
 const searchInputRef = ref(null)
+
+// ==========================================================================
+//  État local
+// ==========================================================================
+
 const isOpen = ref(false)
 const isFocused = ref(false)
 const searchQuery = ref('')
@@ -450,18 +515,18 @@ const highlightedIndex = ref(-1)
 const isMouseDown = ref(false)
 
 // ==========================================================================
-//  Options et valeurs
+//  Computed — Options et valeurs
 // ==========================================================================
 
-/** Récupère la valeur sélectionnée (pour mode single) */
 const selectedValue = computed(() => {
   if (props.multiple) {
     return props.modelValue || []
   }
-  return props.modelValue !== undefined && props.modelValue !== null ? props.modelValue : ''
+  return props.modelValue !== undefined && props.modelValue !== null
+    ? props.modelValue
+    : ''
 })
 
-/** Liste des options normalisées avec index */
 const normalizedOptions = computed(() => {
   return props.options.map((opt, idx) => ({
     ...opt,
@@ -473,18 +538,16 @@ const normalizedOptions = computed(() => {
   }))
 })
 
-/** Options filtrées selon la recherche */
 const filteredOptions = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return normalizedOptions.value
-  return normalizedOptions.value.filter(opt =>
+  return normalizedOptions.value.filter((opt) =>
     opt.label.toLowerCase().includes(query)
   )
 })
 
-/** Options groupées (si group présent) */
 const groupedOptions = computed(() => {
-  const hasGroups = filteredOptions.value.some(opt => opt.group)
+  const hasGroups = filteredOptions.value.some((opt) => opt.group)
   if (!hasGroups) return []
 
   const groups = {}
@@ -499,38 +562,48 @@ const groupedOptions = computed(() => {
   }))
 })
 
-/** Éléments sélectionnés (objets complets) */
 const selectedItems = computed(() => {
   if (props.multiple) {
-    const values = Array.isArray(selectedValue.value) ? selectedValue.value : []
-    return normalizedOptions.value.filter(opt => values.includes(opt.value))
-  } else {
-    const val = selectedValue.value
-    if (val === '' || val === null || val === undefined) return []
-    const found = normalizedOptions.value.find(opt => opt.value === val)
-    return found ? [found] : []
+    const values = Array.isArray(selectedValue.value)
+      ? selectedValue.value
+      : []
+    return normalizedOptions.value.filter((opt) => values.includes(opt.value))
   }
+  const val = selectedValue.value
+  if (val === '' || val === null || val === undefined) return []
+  const found = normalizedOptions.value.find((opt) => opt.value === val)
+  return found ? [found] : []
 })
 
-/** A-t-on une valeur sélectionnée ? */
 const hasValue = computed(() => {
   if (props.multiple) {
-    return Array.isArray(selectedValue.value) && selectedValue.value.length > 0
+    return (
+      Array.isArray(selectedValue.value) && selectedValue.value.length > 0
+    )
   }
-  return selectedValue.value !== '' && selectedValue.value !== null && selectedValue.value !== undefined
+  return (
+    selectedValue.value !== '' &&
+    selectedValue.value !== null &&
+    selectedValue.value !== undefined
+  )
 })
 
-/** Vérifie si une option est sélectionnée */
+// ==========================================================================
+//  Méthodes utilitaires
+// ==========================================================================
+
 function isSelected(option) {
   if (props.multiple) {
-    return Array.isArray(selectedValue.value) && selectedValue.value.includes(option.value)
+    return (
+      Array.isArray(selectedValue.value) &&
+      selectedValue.value.includes(option.value)
+    )
   }
   return selectedValue.value === option.value
 }
 
-/** Récupère l'index d'une option dans la liste filtrée */
 function getOptionIndex(option) {
-  return filteredOptions.value.findIndex(opt => opt.value === option.value)
+  return filteredOptions.value.findIndex((opt) => opt.value === option.value)
 }
 
 // ==========================================================================
@@ -541,7 +614,9 @@ function selectOption(option) {
   if (option.disabled || props.disabled || props.loading) return
 
   if (props.multiple) {
-    const current = Array.isArray(selectedValue.value) ? [...selectedValue.value] : []
+    const current = Array.isArray(selectedValue.value)
+      ? [...selectedValue.value]
+      : []
     const index = current.indexOf(option.value)
     if (index > -1) {
       current.splice(index, 1)
@@ -550,14 +625,12 @@ function selectOption(option) {
     }
     emit('update:modelValue', current)
     emit('change', current)
-    // Garder le focus sur le champ
     if (searchInputRef.value) {
       searchInputRef.value.focus()
     }
   } else {
     emit('update:modelValue', option.value)
     emit('change', option.value)
-    // Fermer le dropdown après sélection
     closeDropdown()
   }
 }
@@ -565,7 +638,9 @@ function selectOption(option) {
 function removeItem(item) {
   if (props.disabled || props.loading) return
   if (props.multiple) {
-    const current = Array.isArray(selectedValue.value) ? [...selectedValue.value] : []
+    const current = Array.isArray(selectedValue.value)
+      ? [...selectedValue.value]
+      : []
     const index = current.indexOf(item.value)
     if (index > -1) {
       current.splice(index, 1)
@@ -587,10 +662,7 @@ function clearValue() {
     emit('change', '')
   }
   emit('clear')
-  if (searchInputRef.value) {
-    searchInputRef.value.value = ''
-    searchQuery.value = ''
-  }
+  searchQuery.value = ''
   closeDropdown()
 }
 
@@ -603,15 +675,12 @@ function toggleDropdown() {
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     emit('open')
-    // Réinitialiser la recherche
     searchQuery.value = ''
     highlightedIndex.value = -1
-    // Si searchable, focus sur l'input de recherche
     nextTick(() => {
       if (searchInputRef.value) {
         searchInputRef.value.focus()
       }
-      // Mettre à jour la position du dropdown
       updateDropdownPosition()
     })
   } else {
@@ -640,8 +709,6 @@ function updateDropdownPosition() {
   if (!wrapperRef.value || !dropdownRef.value) return
   const rect = wrapperRef.value.getBoundingClientRect()
   const dropdownEl = dropdownRef.value
-  // On laisse le CSS gérer la position (fixe ou absolute via teleport)
-  // On applique un style pour la position
   const scrollY = window.scrollY
   const scrollX = window.scrollX
   const top = rect.bottom + scrollY
@@ -670,11 +737,8 @@ function handleSearchFocus(event) {
 }
 
 function handleSearchBlur(event) {
-  // Ne fermer le dropdown que si on ne clique pas sur une option
-  // Le blur est géré via le click sur l'option (avec mousedown.stop)
   setTimeout(() => {
     if (!isMouseDown.value) {
-      // Fermer après un court délai pour laisser le click se propager
       closeDropdown()
     }
     isMouseDown.value = false
@@ -689,7 +753,10 @@ function handleSearchKeydown(event) {
     event.preventDefault()
   } else if (event.key === 'ArrowDown') {
     event.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, filteredOptions.value.length - 1)
+    highlightedIndex.value = Math.min(
+      highlightedIndex.value + 1,
+      filteredOptions.value.length - 1
+    )
     scrollToHighlighted()
   } else if (event.key === 'ArrowUp') {
     event.preventDefault()
@@ -697,7 +764,10 @@ function handleSearchKeydown(event) {
     scrollToHighlighted()
   } else if (event.key === 'Enter') {
     event.preventDefault()
-    if (highlightedIndex.value >= 0 && highlightedIndex.value < filteredOptions.value.length) {
+    if (
+      highlightedIndex.value >= 0 &&
+      highlightedIndex.value < filteredOptions.value.length
+    ) {
       const option = filteredOptions.value[highlightedIndex.value]
       if (option && !option.disabled) {
         selectOption(option)
@@ -707,7 +777,7 @@ function handleSearchKeydown(event) {
 }
 
 // ==========================================================================
-//  Gestion du clavier sur le contrôle
+//  Navigation clavier sur le contrôle
 // ==========================================================================
 
 function handleKeyDown(event) {
@@ -718,7 +788,6 @@ function handleKeyDown(event) {
     if (!isOpen.value) {
       openDropdown()
     } else {
-      // Déplacer la sélection
       const direction = event.key === 'ArrowDown' ? 1 : -1
       const newIndex = highlightedIndex.value + direction
       if (newIndex >= 0 && newIndex < filteredOptions.value.length) {
@@ -728,7 +797,11 @@ function handleKeyDown(event) {
     }
   } else if (event.key === 'Enter') {
     event.preventDefault()
-    if (isOpen.value && highlightedIndex.value >= 0 && highlightedIndex.value < filteredOptions.value.length) {
+    if (
+      isOpen.value &&
+      highlightedIndex.value >= 0 &&
+      highlightedIndex.value < filteredOptions.value.length
+    ) {
       const option = filteredOptions.value[highlightedIndex.value]
       if (option && !option.disabled) {
         selectOption(option)
@@ -736,16 +809,11 @@ function handleKeyDown(event) {
     } else if (!isOpen.value) {
       openDropdown()
     }
-  } else if (event.key === ' ' && !searchable) {
-    // Espace pour ouvrir si searchable désactivé
+  } else if (event.key === ' ' && !props.searchable) {
     event.preventDefault()
     toggleDropdown()
   }
 }
-
-// ==========================================================================
-//  Scroll vers l'option mise en évidence
-// ==========================================================================
 
 function scrollToHighlighted() {
   if (highlightedIndex.value < 0) return
@@ -763,12 +831,15 @@ function highlightOption(index) {
 }
 
 // ==========================================================================
-//  Gestion du dropdown : position et fermeture externe
+//  Fermeture externe et redimensionnement
 // ==========================================================================
 
 function handleClickOutside(event) {
-  if (wrapperRef.value && !wrapperRef.value.contains(event.target) && isOpen.value) {
-    // Vérifier si le clic est dans le dropdown (qui est en teleport)
+  if (
+    wrapperRef.value &&
+    !wrapperRef.value.contains(event.target) &&
+    isOpen.value
+  ) {
     if (dropdownRef.value && dropdownRef.value.contains(event.target)) return
     closeDropdown()
   }
@@ -781,21 +852,14 @@ function handleWindowResize() {
 }
 
 // ==========================================================================
-//  Événements de transition du dropdown
+//  Transitions dropdown
 // ==========================================================================
 
-function beforeDropdownEnter() {
-  // On ne fait rien
-}
-
+function beforeDropdownEnter() {}
 function afterDropdownEnter() {
-  // On met à jour la position après l'animation
   updateDropdownPosition()
 }
-
-function beforeDropdownLeave() {
-  // On ne fait rien
-}
+function beforeDropdownLeave() {}
 
 // ==========================================================================
 //  Styles calculés
@@ -816,23 +880,12 @@ const customStyle = computed(() => {
 })
 
 // ==========================================================================
-//  Position du dropdown (pour teleport)
-// ==========================================================================
-
-const dropdownStyle = computed(() => {
-  // On laisse les styles dynamiques via updateDropdownPosition
-  return {}
-})
-
-// ==========================================================================
 //  Watchers
 // ==========================================================================
 
 watch(
   () => props.options,
-  () => {
-    // Si les options changent, rafraîchir les sélections
-  },
+  () => {},
   { deep: true }
 )
 
@@ -843,7 +896,6 @@ watch(
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('resize', handleWindowResize)
-  // Initialisation de la position si déjà ouverte
   if (isOpen.value) {
     updateDropdownPosition()
   }
@@ -865,11 +917,6 @@ defineExpose({
   focus: () => wrapperRef.value?.focus(),
   clear: clearValue,
 })
-
-// ==========================================================================
-//  Styles
-// ==========================================================================
-
 </script>
 
 <style lang="scss" scoped>
@@ -1174,9 +1221,11 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   padding: 0 0.1rem;
   opacity: 0.7;
   transition: opacity var(--transition-fast, 150ms) ease;
+
   &:hover {
     opacity: 1;
   }
+
   &:focus-visible {
     outline: 2px solid var(--color-primary, #00d4ff);
     outline-offset: 2px;
@@ -1197,9 +1246,11 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   font-family: inherit;
   padding: 0;
   margin: 0;
+
   &::placeholder {
     color: var(--color-text-muted, #6a7a9a);
   }
+
   &:disabled {
     cursor: not-allowed;
   }
@@ -1216,7 +1267,6 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   flex-shrink: 0;
 }
 
-// --- Spinner ---
 .nexus-select__spinner {
   display: inline-flex;
   width: 1em;
@@ -1237,21 +1287,21 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   animation: nexus-select-spinner-dash 1.5s ease-in-out infinite;
 }
 
-// --- Statut ---
 .nexus-select__status {
   display: inline-flex;
   align-items: center;
   font-weight: var(--font-weight-bold, 700);
   font-size: 0.9em;
+
   &--success {
     color: var(--color-success, #4caf50);
   }
+
   &--error {
     color: var(--color-error, #f44336);
   }
 }
 
-// --- Clear ---
 .nexus-select__clear {
   display: inline-flex;
   align-items: center;
@@ -1264,26 +1314,29 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   cursor: pointer;
   padding: 0 0.1rem;
   transition: $select-transition;
+
   &:hover {
     color: var(--color-text-primary, #e8edf5);
   }
+
   &:focus-visible {
     outline: 2px solid var(--nexus-select-color);
     outline-offset: 2px;
   }
 }
 
-// --- Arrow ---
 .nexus-select__arrow {
   display: inline-flex;
   align-items: center;
   color: var(--color-text-muted, #6a7a9a);
   transition: transform var(--transition-fast, 150ms) ease;
   font-size: 0.8em;
+
   svg {
     width: 1em;
     height: 0.7em;
   }
+
   .nexus-select-wrapper--open & {
     transform: rotate(180deg);
   }
@@ -1325,32 +1378,36 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   padding: 0.2rem 0;
   min-width: 150px;
 
-  // Tailles (héritées du wrapper, mais ajustables)
   &--sm {
     font-size: 0.8rem;
   }
+
   &--md {
     font-size: 0.95rem;
   }
+
   &--lg {
     font-size: 1.1rem;
   }
 
-  // Scrollbar personnalisée
   &::-webkit-scrollbar {
     width: 6px;
   }
+
   &::-webkit-scrollbar-track {
     background: var(--color-bg-secondary, #141a2b);
     border-radius: 3px;
   }
+
   &::-webkit-scrollbar-thumb {
     background: var(--color-border, #1a2538);
     border-radius: 3px;
+
     &:hover {
       background: var(--color-text-muted, #6a7a9a);
     }
   }
+
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) var(--color-bg-secondary);
 }
@@ -1368,6 +1425,9 @@ $select-transition: all var(--transition-fast, 150ms) ease;
 }
 
 .nexus-select__option-group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   padding: 0.3rem 0.8rem;
   font-weight: var(--font-weight-semibold, 600);
   color: var(--color-text-muted, #6a7a9a);
@@ -1375,9 +1435,6 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   background: var(--color-bg-secondary, #141a2b);
-  sticky;
-  top: 0;
-  z-index: 1;
 }
 
 .nexus-select__option {
@@ -1420,6 +1477,7 @@ $select-transition: all var(--transition-fast, 150ms) ease;
   flex-shrink: 0;
   font-size: 0.7em;
   color: var(--nexus-select-color);
+
   .nexus-select__option-checkmark {
     font-weight: bold;
   }
@@ -1452,7 +1510,8 @@ $select-transition: all var(--transition-fast, 150ms) ease;
 
 .nexus-select-dropdown-enter-active,
 .nexus-select-dropdown-leave-active {
-  transition: opacity var(--transition-fast, 150ms) ease, transform var(--transition-fast, 150ms) ease;
+  transition: opacity var(--transition-fast, 150ms) ease,
+    transform var(--transition-fast, 150ms) ease;
 }
 
 .nexus-select-dropdown-enter-from,
@@ -1472,7 +1531,9 @@ $select-transition: all var(--transition-fast, 150ms) ease;
 // ==========================================================================
 
 @keyframes nexus-select-spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes nexus-select-spinner-dash {
@@ -1499,48 +1560,62 @@ $select-transition: all var(--transition-fast, 150ms) ease;
     --nexus-select-bg: var(--color-bg-input, #f0f2f5);
     --nexus-select-border: var(--color-border, #d0d8e0);
   }
+
   .nexus-select__control {
     color: var(--color-text-primary, #1a1a2e);
   }
+
   .nexus-select__search-input {
     color: var(--color-text-primary, #1a1a2e);
+
     &::placeholder {
       color: var(--color-text-muted, #7a8a9a);
     }
   }
+
   .nexus-select__label {
     color: var(--color-text-secondary, #3d4a5c);
   }
+
   .nexus-select__option {
     color: var(--color-text-primary, #1a1a2e);
+
     &--highlighted {
       background: var(--color-bg-hover, #e3e8ef);
     }
+
     &--selected {
       color: var(--nexus-select-color);
     }
+
     &:hover:not(&--disabled) {
       background: var(--color-bg-hover, #e3e8ef);
     }
   }
+
   .nexus-select__dropdown {
     background: var(--color-bg-card, #ffffff);
     border-color: var(--color-border, #d0d8e0);
     box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
   }
+
   .nexus-select__option-group-label {
     background: var(--color-bg-secondary, #e9ecf2);
     color: var(--color-text-muted, #7a8a9a);
   }
+
   .nexus-select__tag {
     color: var(--color-text-inverse, #0a0e1a);
   }
+
   .nexus-select__clear:hover {
     color: var(--color-text-primary, #1a1a2e);
   }
+
   .nexus-select__placeholder {
     color: var(--color-text-muted, #7a8a9a);
   }
+
   .nexus-select__single-value {
     color: var(--color-text-primary, #1a1a2e);
   }
