@@ -25,14 +25,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Installer les dépendances Python
+# Installer les dépendances Python (playwright inclus via requirements.txt)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Installer Playwright + Chromium
-RUN pip install --no-cache-dir --prefix=/install playwright==1.41.1 \
-    && /install/bin/playwright install chromium \
-    && /install/bin/playwright install-deps
+# - `python -m playwright` évite le shebang cassé de /install/bin/playwright
+# - PYTHONPATH pointe vers /install pour que le module soit trouvé
+# - PLAYWRIGHT_BROWSERS_PATH fixe l'emplacement des navigateurs
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN PYTHONPATH=/install/lib/python3.10/site-packages \
+    python -m playwright install chromium
 
 # --------------------------------------------------------------------------
 #  STAGE 2 : BUILDER — Frontend Node.js
@@ -40,8 +43,7 @@ RUN pip install --no-cache-dir --prefix=/install playwright==1.41.1 \
 
 FROM node:20-alpine AS builder-node
 
-# ⚠️ IMPORTANT : NODE_ENV=development pour installer les devDependencies
-#    (Vite, Rollup, Sass, etc. sont nécessaires au build)
+# ⚠️ NODE_ENV=development pour installer les devDependencies (Vite, Rollup, Sass…)
 ENV NODE_ENV=development \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -52,24 +54,19 @@ ARG API_BACKEND_URL=/api
 
 WORKDIR /build
 
-# Copier uniquement les fichiers de dépendances (cache Docker)
 COPY frontend/package.json ./
 COPY frontend/package-lock.json* ./
 COPY frontend/.npmrc* ./
 
-# ✅ Utiliser npm install (pas npm ci, car pas de lock file garanti)
 RUN npm install --no-audit --no-fund --no-progress --legacy-peer-deps \
     && npm cache clean --force || true
 
-# Copier le reste du frontend
 COPY frontend/ .
 
-# Variables d'environnement pour Vite
 ENV VITE_API_BASE=/api \
     VITE_APP_VERSION=${VERSION} \
     VITE_API_BACKEND_URL=${API_BACKEND_URL}
 
-# Build de production
 RUN npm run build
 
 # --------------------------------------------------------------------------
@@ -97,7 +94,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8000
 
-# Installer Nginx + Supervisor + dépendances Playwright runtime
+# Installer Nginx + Supervisor + libs runtime Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
@@ -127,7 +124,8 @@ RUN groupadd -r nexusdl \
 
 # Copier les dépendances Python
 COPY --from=builder-python /install /usr/local
-COPY --from=builder-python /root/.cache/ms-playwright /ms-playwright
+# Copier les navigateurs Playwright depuis le chemin fixé
+COPY --from=builder-python /ms-playwright /ms-playwright
 
 # Copier le backend
 WORKDIR /app
@@ -275,7 +273,6 @@ EOF
 
 # Ajuster les permissions
 RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
-    && chmod +x /usr/local/bin/playwright \
     && mkdir -p /var/log/supervisor \
     && chown -R nexusdl:nexusdl /var/log/nginx /var/log/supervisor
 
