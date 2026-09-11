@@ -5,11 +5,6 @@
 #  Version : 2.0.0
 #  Architecture : Multi-stage (builder + playwright + production)
 #  Licence : GNU GPL v3.0
-#
-#  ⚠️ IMPORTANT :
-#  - Ce Dockerfile nécessite `requirements.txt` dans le même dossier.
-#  - Playwright est installé pour gérer les sites JS/Cloudflare.
-#  - L'image finale est optimisée (~600 MB avec Chromium).
 # ==========================================================================
 
 # --------------------------------------------------------------------------
@@ -18,7 +13,6 @@
 
 FROM python:3.10-slim AS builder
 
-# --- Configuration de l'environnement ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -26,12 +20,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     DEBIAN_FRONTEND=noninteractive
 
-# --- Arguments de build ---
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 ARG GIT_COMMIT=unknown
 
-# --- Métadonnées (builder) ---
 LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL Backend (Builder)" \
       org.opencontainers.image.version="${VERSION}" \
@@ -40,7 +32,6 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.description="NexusDL 2.0 - Backend FastAPI (builder stage)" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
-# --- Dépendances système minimales pour le build ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -54,35 +45,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/cache/apt/archives/*
 
-# --- Définir le répertoire de travail ---
 WORKDIR /build
 
-# --- Copier uniquement `requirements.txt` (cache Docker optimisé) ---
 COPY requirements.txt .
 
-# --- Installer les dépendances Python dans /install ---
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # --------------------------------------------------------------------------
-#  STAGE 2 : PLAYWRIGHT — Installation du navigateur Chromium
-#  Ce stage est séparé pour optimiser le cache Docker : si requirements.txt
-#  change, Playwright n'est pas réinstallé inutilement.
+#  STAGE 2 : PLAYWRIGHT — Téléchargement de Chromium
 # --------------------------------------------------------------------------
 
 FROM builder AS playwright-installer
 
-# --- Installer Playwright et Chromium ---
-RUN pip install --no-cache-dir --prefix=/install playwright==1.41.1 \
-    && /install/bin/playwright install chromium \
-    && /install/bin/playwright install-deps
+# Playwright est déjà dans requirements.txt → présent dans /install.
+# On utilise `python -m playwright` (le binaire /install/bin/playwright a un
+# shebang qui pointe vers le python système, lequel ne voit pas /install/lib).
+# PLAYWRIGHT_BROWSERS_PATH fixe le chemin des navigateurs, copié ensuite.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN PYTHONPATH=/install/lib/python3.10/site-packages \
+    python -m playwright install chromium
 
 # --------------------------------------------------------------------------
-#  STAGE 3 : PRODUCTION — Image finale légère et sécurisée
+#  STAGE 3 : PRODUCTION — Image finale
 # --------------------------------------------------------------------------
 
 FROM python:3.10-slim AS production
 
-# --- Configuration de l'environnement ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
@@ -93,12 +81,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     DEBIAN_FRONTEND=noninteractive
 
-# --- Arguments de build ---
 ARG BUILD_DATE=2025-01-15T00:00:00Z
 ARG VERSION=2.0.0
 ARG GIT_COMMIT=unknown
 
-# --- Métadonnées (image finale) ---
 LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.title="NexusDL Backend" \
       org.opencontainers.image.version="${VERSION}" \
@@ -108,17 +94,19 @@ LABEL maintainer="NexusDL Community <nexusdl@example.com>" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/nexus-dl/nexus-dl"
 
-# --- Création d'un utilisateur non-root ---
 RUN groupadd -r nexusdl \
     && useradd -r -g nexusdl -d /app -s /sbin/nologin nexusdl \
     && mkdir -p /app/data/downloads /app/data/cache /app/data/temp /app/logs \
     && chown -R nexusdl:nexusdl /app
 
-# --- Dépendances système minimales pour le runtime ---
+# Dépendances runtime Chromium (liste explicite, inclut nspr4/atk1.0/cups2)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
     libatk-bridge2.0-0 \
+    libcups2 \
     libdrm2 \
     libxkbcommon0 \
     libgbm1 \
@@ -136,33 +124,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/cache/apt/archives/*
 
-# --- Copier les dépendances Python depuis le builder ---
 COPY --from=playwright-installer /install /usr/local
-COPY --from=playwright-installer /root/.cache/ms-playwright /ms-playwright
+COPY --from=playwright-installer /ms-playwright /ms-playwright
 
-# --- Copier le code source de l'application ---
 WORKDIR /app
 COPY --chown=nexusdl:nexusdl ./app ./app
 
-# Copier .env si présent (optionnel)
 COPY --chown=nexusdl:nexusdl .env* ./
 
-# --- Ajuster les permissions ---
-RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
-    && chmod +x /usr/local/bin/playwright
+RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright
 
-# --- Utilisateur non-root ---
 USER nexusdl
 
-# --- Exposer le port ---
 EXPOSE 8000
 
-# --- Healthcheck ---
 HEALTHCHECK --interval=30s \
             --timeout=10s \
             --start-period=60s \
             --retries=5 \
     CMD curl -fsS http://localhost:8000/health || exit 1
 
-# --- Point d'entrée ---
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
