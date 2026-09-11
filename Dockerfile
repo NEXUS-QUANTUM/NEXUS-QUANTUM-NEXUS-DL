@@ -18,21 +18,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     DEBIAN_FRONTEND=noninteractive
 
-# Dépendances système pour le build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget gnupg ca-certificates unzip gcc g++ make \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Installer les dépendances Python (playwright inclus via requirements.txt)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Installer Playwright + Chromium
-# - `python -m playwright` évite le shebang cassé de /install/bin/playwright
-# - PYTHONPATH pointe vers /install pour que le module soit trouvé
-# - PLAYWRIGHT_BROWSERS_PATH fixe l'emplacement des navigateurs
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN PYTHONPATH=/install/lib/python3.10/site-packages \
     python -m playwright install chromium
@@ -43,7 +37,6 @@ RUN PYTHONPATH=/install/lib/python3.10/site-packages \
 
 FROM node:20-alpine AS builder-node
 
-# ⚠️ NODE_ENV=development pour installer les devDependencies (Vite, Rollup, Sass…)
 ENV NODE_ENV=development \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -94,7 +87,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8000
 
-# Installer Nginx + Supervisor + libs runtime Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
@@ -116,25 +108,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Créer l'utilisateur non-root
 RUN groupadd -r nexusdl \
     && useradd -r -g nexusdl -d /app -s /sbin/nologin nexusdl \
     && mkdir -p /app/data/downloads /app/data/cache /app/data/temp /app/logs \
     && chown -R nexusdl:nexusdl /app
 
-# Copier les dépendances Python
 COPY --from=builder-python /install /usr/local
-# Copier les navigateurs Playwright depuis le chemin fixé
 COPY --from=builder-python /ms-playwright /ms-playwright
 
-# Copier le backend
 WORKDIR /app
 COPY backend/app ./app
 
-# Copier le .env (optionnel)
 COPY .env* ./
 
-# Copier le frontend construit
 COPY --from=builder-node /build/dist /var/www/html
 
 # ==========================================================================
@@ -233,7 +219,7 @@ server {
 EOF
 
 # ==========================================================================
-#  CONFIGURATION SUPERVISOR (inline)
+#  CONFIGURATION SUPERVISOR (inline, conservée pour référence)
 # ==========================================================================
 
 RUN cat > /etc/supervisor/conf.d/nexusdl.conf << 'EOF'
@@ -252,7 +238,6 @@ user=nexusdl
 autostart=true
 autorestart=true
 stdout_logfile=/app/logs/backend-out.log
-stderr_logfile=/app/logs/backend-err.log
 redirect_stderr=true
 stopasgroup=true
 killasgroup=true
@@ -264,27 +249,22 @@ user=root
 autostart=true
 autorestart=true
 stdout_logfile=/app/logs/nginx-out.log
-stderr_logfile=/app/logs/nginx-err.log
 redirect_stderr=true
 stopasgroup=true
 killasgroup=true
 priority=20
 EOF
 
-# Ajuster les permissions
 RUN chown -R nexusdl:nexusdl /app /usr/local /ms-playwright \
     && mkdir -p /var/log/supervisor \
     && chown -R nexusdl:nexusdl /var/log/nginx /var/log/supervisor
 
-# Vérifier la config Nginx
 RUN nginx -t
 
-# Exposer le port 80
-EXPOSE 80
+EXPOSE 8000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD curl -fsS http://localhost/nginx-health || exit 1
-
-# Point d'entrée
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# ⚠️ TEMPORAIRE — MODE DEBUG
+# On court-circuite supervisor pour voir la stacktrace dans les logs Render.
+# Uvicorn démarre directement et toute erreur Python remonte dans stdout.
+# Une fois le bug identifié, on remettra la ligne CMD supervisor d'origine.
+CMD ["sh", "-c", "cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug"]
