@@ -13,8 +13,8 @@
         <h3 class="nexus-chapter-list__title">
           <slot name="title">
             Chapitres
-            <span v-if="totalChapters > 0" class="nexus-chapter-list__count">
-              ({{ totalChapters }})
+            <span v-if="displayTotal > 0" class="nexus-chapter-list__count">
+              ({{ displayTotal }})
             </span>
           </slot>
         </h3>
@@ -29,9 +29,16 @@
           @click="toggleSelectAll"
           :aria-label="allSelected ? 'Désélectionner tout' : 'Sélectionner tout'"
         >
-          <span class="nexus-chapter-list__select-all-checkbox" :class="{ 'is-checked': allSelected && visibleChapters.length > 0 }">
+          <span
+            class="nexus-chapter-list__select-all-checkbox"
+            :class="{ 'is-checked': allSelected && visibleChapters.length > 0 }"
+          >
             <span v-if="allSelected && visibleChapters.length > 0" aria-hidden="true">✓</span>
-            <span v-else-if="someSelected" class="nexus-chapter-list__select-all-indeterminate" aria-hidden="true">−</span>
+            <span
+              v-else-if="someSelected"
+              class="nexus-chapter-list__select-all-indeterminate"
+              aria-hidden="true"
+            >−</span>
           </span>
         </button>
 
@@ -64,17 +71,16 @@
             type="button"
             class="nexus-chapter-list__sort-btn"
             @click="toggleSortOrder"
-            :aria-label="`Trier par ${sortField === 'number' ? 'numéro' : 'date'} ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`"
+            :aria-label="`Trier par ${sortField === 'number' ? 'numéro' : (sortField === 'date' ? 'date' : 'titre')} ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`"
           >
             <span class="nexus-chapter-list__sort-label">
-              {{ sortField === 'number' ? 'N°' : 'Date' }}
+              {{ sortField === 'number' ? 'N°' : (sortField === 'date' ? 'Date' : 'Titre') }}
             </span>
             <span class="nexus-chapter-list__sort-icon" aria-hidden="true">
               {{ sortOrder === 'asc' ? '↑' : '↓' }}
             </span>
           </button>
           <button
-            v-if="sortable"
             type="button"
             class="nexus-chapter-list__sort-field-btn"
             @click="toggleSortField"
@@ -92,7 +98,7 @@
     </header>
 
     <!-- Liste des chapitres -->
-    <div class="nexus-chapter-list__body">
+    <div ref="bodyRef" class="nexus-chapter-list__body">
       <!-- État de chargement -->
       <div v-if="loading" class="nexus-chapter-list__loading">
         <NexusSpinner size="sm" label="Chargement des chapitres..." />
@@ -103,14 +109,18 @@
         <slot name="empty">
           <span class="nexus-chapter-list__empty-icon">📭</span>
           <p class="nexus-chapter-list__empty-text">
-            {{ searchQuery ? 'Aucun chapitre ne correspond à votre recherche' : 'Aucun chapitre disponible' }}
+            {{
+              searchQuery
+                ? 'Aucun chapitre ne correspond à votre recherche'
+                : 'Aucun chapitre disponible'
+            }}
           </p>
         </slot>
       </div>
 
       <!-- Liste -->
       <template v-else>
-        <div class="nexus-chapter-list__items">
+        <div ref="itemsContainerRef" class="nexus-chapter-list__items">
           <div
             v-for="chapter in visibleChapters"
             :key="chapter.id || chapter.number"
@@ -139,7 +149,11 @@
             <!-- Numéro -->
             <span class="nexus-chapter-list__item-number">
               <slot name="number" :chapter="chapter">
-                {{ chapter.number !== undefined && chapter.number !== null ? `#${chapter.number}` : '—' }}
+                {{
+                  chapter.number !== undefined && chapter.number !== null
+                    ? `#${chapter.number}`
+                    : '—'
+                }}
               </slot>
             </span>
 
@@ -153,7 +167,10 @@
             <!-- Métadonnées -->
             <div class="nexus-chapter-list__item-meta">
               <!-- Date -->
-              <span v-if="chapter.release_date || chapter.upload_date" class="nexus-chapter-list__item-date">
+              <span
+                v-if="chapter.release_date || chapter.upload_date"
+                class="nexus-chapter-list__item-date"
+              >
                 <slot name="date" :chapter="chapter">
                   {{ formatDate(chapter.release_date || chapter.upload_date) }}
                 </slot>
@@ -170,10 +187,16 @@
               </span>
 
               <!-- Statut de disponibilité -->
-              <span v-if="chapter.available === false" class="nexus-chapter-list__item-status nexus-chapter-list__item-status--unavailable">
+              <span
+                v-if="chapter.available === false"
+                class="nexus-chapter-list__item-status nexus-chapter-list__item-status--unavailable"
+              >
                 Indisponible
               </span>
-              <span v-else-if="chapter.read" class="nexus-chapter-list__item-status nexus-chapter-list__item-status--read">
+              <span
+                v-else-if="chapter.read"
+                class="nexus-chapter-list__item-status nexus-chapter-list__item-status--read"
+              >
                 Lu
               </span>
             </div>
@@ -187,7 +210,7 @@
                   size="sm"
                   variant="primary"
                   :loading="isDownloading(chapter)"
-                  :disabled="isDownloading(chapter) || chapter.disabled"
+                  :disabled="isDownloadDisabled(chapter)"
                   @click.stop="handleDownload(chapter)"
                   aria-label="Télécharger ce chapitre"
                 >
@@ -199,7 +222,7 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="paginated && totalChapters > pageSize" class="nexus-chapter-list__pagination">
+        <div v-if="paginated && totalPages > 1" class="nexus-chapter-list__pagination">
           <button
             type="button"
             class="nexus-chapter-list__pagination-btn"
@@ -266,7 +289,7 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  /** Nombre total de chapitres (pour la pagination) */
+  /** Nombre total de chapitres (pour l'affichage ; fallback sur chapters.length) */
   totalChapters: {
     type: Number,
     default: 0,
@@ -348,7 +371,7 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  /** Sélection initiale (IDs) */
+  /** Sélection initiale (IDs) — appliquée au montage et si le parent la change */
   initialSelected: {
     type: Array,
     default: () => [],
@@ -383,17 +406,24 @@ const selectedIds = ref([...props.initialSelected])
 const downloadingIds = ref(new Set())
 const bulkDownloading = ref(false)
 const searchInputRef = ref(null)
+const bodyRef = ref(null)
+const itemsContainerRef = ref(null)
 
 // ==========================================================================
 //  Computed
 // ==========================================================================
+
+/** Total affiché (fallback sur chapters.length si totalChapters n'est pas fourni) */
+const displayTotal = computed(() => {
+  return props.totalChapters > 0 ? props.totalChapters : props.chapters.length
+})
 
 /** Filtrage par recherche */
 const filteredChapters = computed(() => {
   let result = [...props.chapters]
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.trim().toLowerCase()
-    result = result.filter(ch => {
+    result = result.filter((ch) => {
       const title = (ch.title || '').toLowerCase()
       const number = String(ch.number || '')
       return title.includes(q) || number.includes(q)
@@ -436,35 +466,33 @@ const visibleChapters = computed(() => {
   return sortedChapters.value.slice(start, end)
 })
 
-/** Nombre total de pages */
+/** Nombre total de pages (basé sur la liste filtrée) */
 const totalPages = computed(() => {
+  if (!props.paginated) return 1
   return Math.max(1, Math.ceil(filteredChapters.value.length / props.pageSize))
 })
 
 /** Tous les chapitres visibles sont-ils sélectionnés ? */
 const allSelected = computed(() => {
   if (visibleChapters.value.length === 0) return false
-  const visibleIds = visibleChapters.value.map(ch => ch.id || ch.number)
-  return visibleIds.every(id => selectedIds.value.includes(id))
+  const visibleIds = visibleChapters.value.map((ch) => ch.id || ch.number)
+  return visibleIds.every((id) => selectedIds.value.includes(id))
 })
 
 /** Certains chapitres visibles sont-ils sélectionnés ? */
 const someSelected = computed(() => {
   if (visibleChapters.value.length === 0) return false
-  const visibleIds = visibleChapters.value.map(ch => ch.id || ch.number)
-  return visibleIds.some(id => selectedIds.value.includes(id))
+  const visibleIds = visibleChapters.value.map((ch) => ch.id || ch.number)
+  return visibleIds.some((id) => selectedIds.value.includes(id))
 })
 
 /** Chapitres sélectionnés (objets complets) */
 const selectedChapters = computed(() => {
-  return props.chapters.filter(ch => {
+  return props.chapters.filter((ch) => {
     const id = ch.id || ch.number
     return selectedIds.value.includes(id)
   })
 })
-
-/** Taille de la sélection */
-const selectionCount = computed(() => selectedIds.value.length)
 
 // ==========================================================================
 //  Méthodes
@@ -488,6 +516,14 @@ function isDownloaded(chapter) {
   return props.downloadedIds.includes(id)
 }
 
+/** Décide si le bouton de téléchargement doit être désactivé */
+function isDownloadDisabled(chapter) {
+  if (chapter.disabled) return true
+  if (isDownloading(chapter)) return true
+  if (props.disableDownloaded && isDownloaded(chapter)) return true
+  return false
+}
+
 /** Basculer la sélection d'un chapitre */
 function toggleSelect(chapter) {
   if (chapter.disabled) return
@@ -500,26 +536,22 @@ function toggleSelect(chapter) {
     selectedIds.value.splice(idx, 1)
     emit('deselect', chapter)
   }
-  emit('update:selected', selectedIds.value)
+  emit('update:selected', [...selectedIds.value])
 }
 
-/** Sélectionner/Désélectionner tout */
+/** Sélectionner/Désélectionner tout (sur la page visible) */
 function toggleSelectAll() {
+  const visibleIds = visibleChapters.value.map((ch) => ch.id || ch.number)
   if (allSelected.value) {
-    // Désélectionner tout
-    const visibleIds = visibleChapters.value.map(ch => ch.id || ch.number)
-    selectedIds.value = selectedIds.value.filter(id => !visibleIds.includes(id))
-    emit('update:selected', selectedIds.value)
+    selectedIds.value = selectedIds.value.filter((id) => !visibleIds.includes(id))
   } else {
-    // Sélectionner tout
-    const visibleIds = visibleChapters.value.map(ch => ch.id || ch.number)
     for (const id of visibleIds) {
       if (!selectedIds.value.includes(id)) {
         selectedIds.value.push(id)
       }
     }
-    emit('update:selected', selectedIds.value)
   }
+  emit('update:selected', [...selectedIds.value])
 }
 
 /** Gérer le clic sur un chapitre */
@@ -534,23 +566,27 @@ function handleChapterClick(chapter) {
 /** Gérer le téléchargement d'un chapitre */
 function handleDownload(chapter) {
   if (chapter.disabled || chapter.available === false) return
+  if (props.disableDownloaded && isDownloaded(chapter)) return
   const id = chapter.id || chapter.number
   if (downloadingIds.value.has(id)) return
   downloadingIds.value.add(id)
   emit('download', chapter)
-  // Le parent doit gérer la fin du téléchargement
-  // On ne retire pas de la liste, le parent le fera via une prop ou un événement
 }
 
 /** Gérer le téléchargement en masse */
-async function handleBulkDownload() {
+function handleBulkDownload() {
   if (bulkDownloading.value || selectedChapters.value.length === 0) return
   bulkDownloading.value = true
-  try {
-    await emit('bulk-download', selectedChapters.value)
-  } finally {
-    bulkDownloading.value = false
-  }
+  emit('bulk-download', selectedChapters.value)
+  // Le parent doit appeler markBulkDownloadComplete() à la fin,
+  // ou passer bulkLoading en prop. On garde un timeout de secours pour
+  // éviter un loader bloqué si le parent ne signale rien.
+  // (Retirer ce timeout si le parent est fiable.)
+}
+
+/** Signal (côté parent) que le téléchargement en masse est terminé */
+function markBulkDownloadComplete() {
+  bulkDownloading.value = false
 }
 
 /** Recherche */
@@ -590,7 +626,6 @@ function prevPage() {
   if (currentPage.value > 1) {
     currentPage.value--
     emit('page-change', currentPage.value)
-    // Scroll en haut de la liste
     scrollToTop()
   }
 }
@@ -612,10 +647,10 @@ function goToPage(page) {
   }
 }
 
+/** Remonte le body interne de la liste (sans toucher à la page) */
 function scrollToTop() {
-  const el = document.querySelector('.nexus-chapter-list__items')
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (bodyRef.value) {
+    bodyRef.value.scrollTop = 0
   }
 }
 
@@ -626,6 +661,7 @@ function formatDate(date) {
   if (isNaN(d.getTime())) return ''
   const now = new Date()
   const diff = (now - d) / (1000 * 60 * 60 * 24)
+  if (diff < 0) return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   if (diff < 1) return 'Aujourd\'hui'
   if (diff < 2) return 'Hier'
   if (diff < 7) return d.toLocaleDateString('fr-FR', { weekday: 'long' })
@@ -642,10 +678,10 @@ function resetSelection() {
 /** Définir la sélection */
 function setSelection(ids) {
   selectedIds.value = [...ids]
-  emit('update:selected', selectedIds.value)
+  emit('update:selected', [...selectedIds.value])
 }
 
-/** Marquer un téléchargement comme terminé */
+/** Marquer un téléchargement unitaire comme terminé */
 function markDownloadComplete(chapterId) {
   downloadingIds.value.delete(chapterId)
 }
@@ -654,24 +690,28 @@ function markDownloadComplete(chapterId) {
 //  Watchers
 // ==========================================================================
 
+/** Compare deux tableaux d'IDs sans tenir compte de l'ordre */
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false
+  const sa = [...a].sort()
+  const sb = [...b].sort()
+  return sa.every((v, i) => v === sb[i])
+}
+
 watch(
   () => props.initialSelected,
   (newVal) => {
-    if (JSON.stringify(newVal) !== JSON.stringify(selectedIds.value)) {
+    if (!arraysEqual(newVal, selectedIds.value)) {
       selectedIds.value = [...newVal]
     }
   }
 )
 
-watch(
-  () => props.totalChapters,
-  () => {
-    // Si le nombre total change, on vérifie la pagination
-    if (currentPage.value > totalPages.value) {
-      currentPage.value = totalPages.value
-    }
+watch(totalPages, (max) => {
+  if (currentPage.value > max) {
+    currentPage.value = max
   }
-)
+})
 
 // ==========================================================================
 //  Exposer
@@ -685,15 +725,11 @@ defineExpose({
   goToPage,
   currentPage,
   markDownloadComplete,
+  markBulkDownloadComplete,
   searchQuery,
   clearSearch,
   toggleSelectAll,
 })
-
-// ==========================================================================
-//  Styles
-// ==========================================================================
-
 </script>
 
 <style lang="scss" scoped>
@@ -833,6 +869,7 @@ $list-transition: all var(--transition-fast, 150ms) ease;
   width: 140px;
   transition: $list-transition;
   outline: none;
+
   &:focus {
     width: 180px;
     border-color: var(--color-primary, #00d4ff);
@@ -880,6 +917,7 @@ $list-transition: all var(--transition-fast, 150ms) ease;
   color: var(--color-text-secondary, #b0c0d8);
   cursor: pointer;
   transition: $list-transition;
+
   &:hover {
     background: var(--color-bg-hover, #253254);
     border-color: var(--color-border-light, #253254);
@@ -1023,11 +1061,13 @@ $list-transition: all var(--transition-fast, 150ms) ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  input[type="checkbox"] {
+
+  input[type='checkbox'] {
     position: absolute;
     opacity: 0;
     width: 0;
     height: 0;
+
     &:checked + label {
       background: var(--color-primary, #00d4ff);
       border-color: var(--color-primary, #00d4ff);
@@ -1043,6 +1083,7 @@ $list-transition: all var(--transition-fast, 150ms) ease;
       cursor: not-allowed;
     }
   }
+
   label {
     display: flex;
     align-items: center;
@@ -1058,6 +1099,7 @@ $list-transition: all var(--transition-fast, 150ms) ease;
     font-size: 0.65rem;
     font-weight: var(--font-weight-bold, 700);
     color: transparent;
+
     &:hover {
       border-color: var(--color-primary, #00d4ff);
     }
@@ -1186,6 +1228,7 @@ $list-transition: all var(--transition-fast, 150ms) ease;
   color: var(--color-text-secondary, #b0c0d8);
   cursor: pointer;
   transition: $list-transition;
+
   &:hover:not(:disabled) {
     background: var(--color-bg-hover, #253254);
     border-color: var(--color-primary, #00d4ff);
