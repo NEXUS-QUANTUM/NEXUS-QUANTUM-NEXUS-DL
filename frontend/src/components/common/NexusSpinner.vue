@@ -31,7 +31,12 @@
       <div class="nexus-spinner__animation">
         <!-- Différents types de spinner selon la variante -->
         <template v-if="variant === 'dots'">
-          <span class="nexus-spinner__dot" v-for="i in 3" :key="i" :style="{ animationDelay: `${i * 0.15}s` }">
+          <span
+            class="nexus-spinner__dot"
+            v-for="i in 3"
+            :key="i"
+            :style="{ animationDelay: `${i * 0.15}s` }"
+          >
             <span class="nexus-spinner__dot-inner" />
           </span>
         </template>
@@ -51,7 +56,12 @@
 
         <template v-else-if="variant === 'dots-wave'">
           <div class="nexus-spinner__wave">
-            <span class="nexus-spinner__wave-dot" v-for="i in 5" :key="i" :style="{ animationDelay: `${i * 0.1}s` }" />
+            <span
+              class="nexus-spinner__wave-dot"
+              v-for="i in 5"
+              :key="i"
+              :style="{ animationDelay: `${i * 0.1}s` }"
+            />
           </div>
         </template>
 
@@ -78,7 +88,11 @@
 
         <!-- Par défaut : spinner circulaire (classique) -->
         <template v-else>
-          <svg class="nexus-spinner__circle" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            class="nexus-spinner__circle"
+            viewBox="0 0 50 50"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <circle
               class="nexus-spinner__circle-path"
               cx="25"
@@ -102,12 +116,16 @@
     </div>
 
     <!-- Si overlay, on ajoute un fond semi-transparent derrière -->
-    <div v-if="overlay" class="nexus-spinner__overlay-backdrop" :style="overlayStyle" />
+    <div
+      v-if="overlay"
+      class="nexus-spinner__overlay-backdrop"
+      :style="overlayStyle"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 // ==========================================================================
 //  Props
@@ -119,7 +137,7 @@ const props = defineProps({
     type: String,
     default: 'circle',
     validator: (val) =>
-      ['circle', 'dots', 'pulse', 'bar', 'dots-wave', 'gradient', 'logo'].includes(val),
+      ['circle', 'dots', 'pulse', 'bar', 'dots-wave', 'gradient'].includes(val),
   },
   /** Taille du spinner */
   size: {
@@ -190,10 +208,6 @@ const props = defineProps({
 })
 
 // ==========================================================================
-//  Émits (aucun)
-// ==========================================================================
-
-// ==========================================================================
 //  Styles calculés
 // ==========================================================================
 
@@ -201,13 +215,12 @@ const strokeColor = computed(() => {
   if (props.color) return props.color
   // Couleurs par défaut selon la variante
   const map = {
-    circle: 'var(--color-primary, #00d4ff)',
-    dots: 'var(--color-primary, #00d4ff)',
-    pulse: 'var(--color-primary, #00d4ff)',
-    bar: 'var(--color-primary, #00d4ff)',
-    dotsWave: 'var(--color-primary, #00d4ff)',
-    gradient: 'var(--color-primary, #00d4ff)',
-    logo: 'var(--color-primary, #00d4ff)',
+    'circle': 'var(--color-primary, #00d4ff)',
+    'dots': 'var(--color-primary, #00d4ff)',
+    'pulse': 'var(--color-primary, #00d4ff)',
+    'bar': 'var(--color-primary, #00d4ff)',
+    'dots-wave': 'var(--color-primary, #00d4ff)',
+    'gradient': 'var(--color-primary, #00d4ff)',
   }
   return map[props.variant] || 'var(--color-primary, #00d4ff)'
 })
@@ -219,16 +232,16 @@ const gradientEndColor = computed(() => props.gradientEnd)
 const customStyle = computed(() => {
   const style = {}
   if (props.color) {
-    // Appliquer la couleur personnalisée sur les variables CSS
-    style.setProperty('--nexus-spinner-color', props.color)
+    // Vue gère les custom properties comme clés d'objet :style
+    style['--nexus-spinner-color'] = props.color
   }
   if (props.fullscreen || props.fixed) {
-    style.position = props.fixed ? 'fixed' : 'fixed'
+    style.position = 'fixed'
     style.top = 0
     style.left = 0
     style.right = 0
     style.bottom = 0
-    style.zIndex = props.zIndex
+    style.zIndex = String(props.zIndex)
     style.display = 'flex'
     style.alignItems = 'center'
     style.justifyContent = 'center'
@@ -241,16 +254,10 @@ const customStyle = computed(() => {
 
 const overlayStyle = computed(() => {
   if (props.overlay || props.fullscreen) {
-    return {
-      backgroundColor: props.overlayColor,
-    }
+    return { backgroundColor: props.overlayColor }
   }
   return {}
 })
-
-// ==========================================================================
-//  Exposer les méthodes (aucune)
-// ==========================================================================
 </script>
 
 <style lang="scss" scoped>
@@ -471,7 +478,7 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
     }
   }
 
-  // --- Fixed / Fullscreen (géré par le style inline) ---
+  // --- Fixed / Fullscreen (géré par le style inline, on garde un fallback) ---
   &--fixed,
   &--fullscreen {
     position: fixed;
@@ -479,33 +486,29 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: v-bind(zIndex);
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: v-bind(overlayColor);
   }
 
   // --- Custom color (via CSS variable) ---
   &--custom-color {
     .nexus-spinner__circle-path {
-      stroke: var(--nexus-spinner-color) !important;
+      stroke: var(--nexus-spinner-color);
     }
+    .nexus-spinner__dot,
     .nexus-spinner__dot-inner {
-      background: var(--nexus-spinner-color) !important;
+      background: var(--nexus-spinner-color);
     }
     .nexus-spinner__pulse-ring--inner,
     .nexus-spinner__pulse-ring--outer {
-      border-color: var(--nexus-spinner-color) !important;
+      border-color: var(--nexus-spinner-color);
     }
     .nexus-spinner__bar-progress {
-      background: var(--nexus-spinner-color) !important;
+      background: var(--nexus-spinner-color);
     }
     .nexus-spinner__wave-dot {
-      background: var(--nexus-spinner-color) !important;
-    }
-    .nexus-spinner__gradient-path {
-      stroke: var(--nexus-spinner-color) !important;
+      background: var(--nexus-spinner-color);
     }
   }
 
@@ -547,7 +550,9 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
 }
 
 @keyframes nexus-spinner-spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes nexus-spinner-dash {
@@ -589,7 +594,8 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
 }
 
 @keyframes nexus-spinner-dot-fade {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.2;
     transform: scale(0.8);
   }
@@ -610,30 +616,37 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
   display: flex;
   align-items: center;
   justify-content: center;
+}
 
-  &--inner,
-  &--outer {
-    position: absolute;
-    border-radius: 50%;
-    border: 3px solid var(--nexus-spinner-color, #00d4ff);
-    opacity: 0.3;
-    animation: nexus-spinner-pulse 1.2s ease-in-out infinite;
-    &--inner {
-      width: 60%;
-      height: 60%;
-      animation-delay: 0.2s;
-      opacity: 0.5;
-    }
-    &--outer {
-      width: 100%;
-      height: 100%;
-      animation-delay: 0s;
-    }
-  }
+// NOTE : les sélecteurs `&--inner` / `&--outer` imbriqués dans un bloc
+// combinant `&--inner, &--outer` produisaient `.nexus-spinner__pulse-ring--inner--inner`
+// (jamais matché). Sélecteurs sortis au niveau racine.
+
+.nexus-spinner__pulse-ring--inner,
+.nexus-spinner__pulse-ring--outer {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid var(--nexus-spinner-color, #00d4ff);
+  opacity: 0.3;
+  animation: nexus-spinner-pulse 1.2s ease-in-out infinite;
+}
+
+.nexus-spinner__pulse-ring--inner {
+  width: 60%;
+  height: 60%;
+  animation-delay: 0.2s;
+  opacity: 0.5;
+}
+
+.nexus-spinner__pulse-ring--outer {
+  width: 100%;
+  height: 100%;
+  animation-delay: 0s;
 }
 
 @keyframes nexus-spinner-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(0.9);
     opacity: 0.3;
   }
@@ -699,7 +712,8 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
 }
 
 @keyframes nexus-spinner-wave {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
     opacity: 0.3;
   }
@@ -751,9 +765,9 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
   left: 0;
   right: 0;
   bottom: 0;
-  background: v-bind(overlayColor);
   z-index: 1;
   border-radius: inherit;
+  /* background-color est fourni via :style (overlayStyle) côté template. */
 }
 
 // ==========================================================================
@@ -766,9 +780,6 @@ $spinner-transition: all var(--transition-fast, 150ms) ease;
   }
   .nexus-spinner__label-text {
     color: var(--color-text-muted, #7a8a9a);
-  }
-  .nexus-spinner__overlay-backdrop {
-    background: v-bind(overlayColor);
   }
 }
 </style>
