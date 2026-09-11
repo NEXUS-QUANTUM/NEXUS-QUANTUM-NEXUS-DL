@@ -1,6 +1,7 @@
 # ==========================================================================
 #  NexusDL 2.0 - Gestionnaire de Jobs
 #  Fichier : backend/app/workers/job_manager.py
+#  Version : 2.0.0
 # ==========================================================================
 
 import asyncio
@@ -8,7 +9,6 @@ import logging
 import uuid
 from typing import Dict, List, Optional, Any, Callable, Awaitable
 from datetime import datetime
-from enum import Enum
 
 from app.core.exceptions import JobNotFoundError, JobCancelError
 from app.models.job import JobStatus, JobPriority, JobType, JobInMemory
@@ -24,9 +24,7 @@ class JobManager:
     """
 
     def __init__(self):
-        # Stockage des jobs actifs et historiques
         self._jobs: Dict[str, JobInMemory] = {}
-        # Callbacks organisés par type d'événement
         self._callbacks: Dict[str, List[Callable]] = {
             "created": [],
             "updated": [],
@@ -34,7 +32,7 @@ class JobManager:
             "completed": [],
             "failed": [],
             "cancelled": [],
-            "progress": []
+            "progress": [],
         }
         self._lock = asyncio.Lock()
         self._running = False
@@ -45,7 +43,6 @@ class JobManager:
         if self._running:
             return
         self._running = True
-        # Tâche de nettoyage périodique des jobs terminés (optionnelle)
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         logger.info("✅ JobManager démarré")
 
@@ -61,9 +58,9 @@ class JobManager:
             self._cleanup_task = None
         logger.info("✅ JobManager arrêté")
 
-    # ==========================================================================
+    # ======================================================================
     #  Création et gestion des jobs
-    # ==========================================================================
+    # ======================================================================
 
     async def create_job(
         self,
@@ -75,12 +72,9 @@ class JobManager:
         priority: JobPriority = JobPriority.NORMAL,
         job_type: JobType = JobType.DOWNLOAD,
         user_id: Optional[int] = None,
-        data: Optional[Dict[str, Any]] = None
+        data: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        Crée un nouveau job et le place en attente.
-        Retourne l'ID du job créé.
-        """
+        """Crée un nouveau job et le place en attente. Retourne son ID."""
         job_id = f"job_{uuid.uuid4().hex[:12]}_{int(datetime.now().timestamp())}"
         job = JobInMemory(
             job_id=job_id,
@@ -90,7 +84,7 @@ class JobManager:
             priority=priority,
             total_chapters=total_chapters,
             user_id=user_id,
-            data=data or {}
+            data=data or {},
         )
         job.provider_id = provider_id
         job.status = JobStatus.PENDING
@@ -100,7 +94,6 @@ class JobManager:
         async with self._lock:
             self._jobs[job_id] = job
 
-        # Notifier la création
         await self._notify("created", job)
         await self._notify("updated", job)
         logger.info(f"📦 Job créé: {job_id} - {title}")
@@ -115,27 +108,24 @@ class JobManager:
         self,
         status_filter: Optional[JobStatus] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[JobInMemory]:
-        """
-        Récupère tous les jobs, avec filtrage optionnel par statut.
-        """
+        """Récupère tous les jobs, avec filtrage optionnel par statut."""
         async with self._lock:
             jobs = list(self._jobs.values())
             if status_filter:
                 jobs = [j for j in jobs if j.status == status_filter]
-            # Trier par date de création décroissante
             jobs.sort(key=lambda j: j.created_at, reverse=True)
-            return jobs[offset:offset + limit]
+            return jobs[offset : offset + limit]
 
     async def get_active_jobs(self) -> List[JobInMemory]:
         """Récupère les jobs en cours d'exécution ou en attente."""
         async with self._lock:
-            return [j for j in self._jobs.values() if j.is_active()]
+            return [j for j in self._jobs.values() if self._job_is_active(j)]
 
-    # ==========================================================================
+    # ======================================================================
     #  Mises à jour des jobs
-    # ==========================================================================
+    # ======================================================================
 
     async def update_job_status(
         self,
@@ -147,17 +137,15 @@ class JobManager:
         logs: Optional[List[str]] = None,
         errors: Optional[List[str]] = None,
         result_path: Optional[str] = None,
-        result_size: Optional[int] = None
+        result_size: Optional[int] = None,
     ) -> bool:
-        """
-        Met à jour le statut et les métadonnées d'un job.
-        Déclenche les notifications appropriées.
-        """
+        """Met à jour le statut et les métadonnées d'un job."""
         job = await self.get_job(job_id)
         if not job:
             return False
 
         old_status = job.status
+        old_progress = job.progress  # ← capturé AVANT modification
         job.status = status
         job.updated_at = datetime.now().isoformat()
 
@@ -176,20 +164,18 @@ class JobManager:
         if result_size is not None:
             job.result_size = result_size
 
-        # Gestion des dates de début/fin
+        # Dates de début/fin
         if status == JobStatus.RUNNING and old_status != JobStatus.RUNNING:
             job.started_at = datetime.now().isoformat()
-        if status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
-            if status == JobStatus.COMPLETED:
-                job.completed_at = datetime.now().isoformat()
-            elif status == JobStatus.FAILED:
-                job.completed_at = datetime.now().isoformat()  # ou échec
-            elif status == JobStatus.CANCELLED:
-                job.cancelled_at = datetime.now().isoformat()
-            # Nettoyer le job (optionnel)
-            # On peut garder en mémoire pour l'historique
+        if status == JobStatus.COMPLETED:
+            job.completed_at = datetime.now().isoformat()
+        elif status == JobStatus.FAILED:
+            job.completed_at = datetime.now().isoformat()
+        elif status == JobStatus.CANCELLED:
+            job.cancelled_at = datetime.now().isoformat()
 
         await self._notify("updated", job)
+
         if status != old_status:
             if status == JobStatus.RUNNING:
                 await self._notify("started", job)
@@ -200,11 +186,14 @@ class JobManager:
             elif status == JobStatus.CANCELLED:
                 await self._notify("cancelled", job)
 
-        # Notification de progression si le pourcentage a changé significativement
-        if progress is not None and abs(progress - job.progress) > 1.0:
+        # Notification de progression (comparaison à l'ANCIENNE valeur)
+        if progress is not None and abs(progress - old_progress) > 1.0:
             await self._notify("progress", job)
 
-        logger.debug(f"🔄 Job {job_id} mis à jour: {status.value} (progress: {job.progress:.1f}%)")
+        logger.debug(
+            f"🔄 Job {job_id} mis à jour: {status.value} "
+            f"(progress: {job.progress:.1f}%)"
+        )
         return True
 
     async def update_progress(
@@ -212,11 +201,9 @@ class JobManager:
         job_id: str,
         done_chapters: int,
         total_chapters: Optional[int] = None,
-        current_chapter: Optional[str] = None
+        current_chapter: Optional[str] = None,
     ):
-        """
-        Met à jour la progression d'un job sans changer le statut.
-        """
+        """Met à jour la progression d'un job sans changer le statut."""
         job = await self.get_job(job_id)
         if not job:
             return
@@ -241,66 +228,65 @@ class JobManager:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "level": level,
-            "message": message
+            "message": message,
         }
         job.logs.append(log_entry)
-        # Limiter la taille des logs (conserver les 500 derniers)
         if len(job.logs) > 500:
             job.logs = job.logs[-500:]
         job.updated_at = datetime.now().isoformat()
         await self._notify("updated", job)
 
-    # ==========================================================================
-    #  Annulation des jobs
-    # ==========================================================================
+    # ======================================================================
+    #  Annulation
+    # ======================================================================
 
     async def cancel_job(self, job_id: str, force: bool = False) -> bool:
-        """
-        Annule un job en cours d'exécution ou en attente.
-        Si force=True, annule même si le job est en cours de traitement.
-        """
+        """Annule un job en cours ou en attente."""
         job = await self.get_job(job_id)
         if not job:
             raise JobNotFoundError(job_id=job_id)
 
-        if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
-            raise JobCancelError(f"Le job {job_id} est déjà dans un état terminal.")
+        if job.status in (
+            JobStatus.COMPLETED,
+            JobStatus.FAILED,
+            JobStatus.CANCELLED,
+        ):
+            raise JobCancelError(
+                f"Le job {job_id} est déjà dans un état terminal."
+            )
 
         if job.status == JobStatus.RUNNING and not force:
             raise JobCancelError(
-                f"Le job {job_id} est en cours d'exécution. Utilisez force=True pour l'annuler."
+                f"Le job {job_id} est en cours d'exécution. "
+                "Utilisez force=True pour l'annuler."
             )
 
-        # Mettre à jour le statut
         await self.update_job_status(job_id, JobStatus.CANCELLED)
         logger.info(f"⛔ Job annulé: {job_id}")
         return True
 
-    # ==========================================================================
-    #  Gestion des callbacks
-    # ==========================================================================
+    # ======================================================================
+    #  Callbacks
+    # ======================================================================
 
-    def register_callback(self, event: str, callback: Callable[[JobInMemory], Awaitable[None]]):
-        """
-        Enregistre un callback pour un événement donné.
-        Événements possibles: 'created', 'updated', 'started', 'completed', 'failed', 'cancelled', 'progress'
-        """
+    def register_callback(
+        self,
+        event: str,
+        callback: Callable[[JobInMemory], Awaitable[None]],
+    ):
+        """Enregistre un callback pour un événement."""
         if event in self._callbacks:
             self._callbacks[event].append(callback)
         else:
             raise ValueError(f"Événement inconnu: {event}")
 
     def unregister_callback(self, event: str, callback: Callable):
-        """
-        Supprime un callback enregistré.
-        """
+        """Supprime un callback enregistré."""
         if event in self._callbacks and callback in self._callbacks[event]:
             self._callbacks[event].remove(callback)
 
     async def _notify(self, event: str, job: JobInMemory):
-        """
-        Notifie tous les callbacks enregistrés pour un événement.
-        """
+        """Notifie tous les callbacks enregistrés pour un événement."""
         if event not in self._callbacks:
             return
         for cb in self._callbacks[event]:
@@ -308,37 +294,27 @@ class JobManager:
                 if asyncio.iscoroutinefunction(cb):
                     await cb(job)
                 else:
-                    # Si le callback est synchrone, l'exécuter dans un thread
-                    import concurrent.futures
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, cb, job)
             except Exception as e:
                 logger.error(f"Erreur dans le callback {event}: {e}")
 
-    # ==========================================================================
+    # ======================================================================
     #  Maintenance
-    # ==========================================================================
+    # ======================================================================
 
     async def _cleanup_loop(self):
-        """Nettoie périodiquement les jobs terminés (optionnel)."""
+        """Nettoie périodiquement les jobs terminés."""
         while self._running:
-            await asyncio.sleep(3600)  # toutes les heures
-            # Supprimer les jobs terminés depuis plus de 7 jours (exemple)
-            # Ou les déplacer vers une base de données d'historique
-            # Ici on ne les supprime pas pour simplifier
-            pass
+            await asyncio.sleep(3600)
 
     async def cleanup_old_jobs(self, days: int = 7):
-        """
-        Supprime les jobs terminés depuis plus de `days` jours.
-        À utiliser pour libérer de la mémoire.
-        """
+        """Supprime les jobs terminés depuis plus de `days` jours."""
         cutoff = datetime.now().timestamp() - (days * 86400)
         to_delete = []
         async with self._lock:
             for job_id, job in self._jobs.items():
-                if job.is_finished():
-                    # Vérifier la date de complétion (utiliser completed_at ou updated_at)
+                if self._job_is_finished(job):
                     completion_time = job.completed_at or job.updated_at
                     if completion_time:
                         try:
@@ -349,27 +325,69 @@ class JobManager:
                             pass
             for job_id in to_delete:
                 del self._jobs[job_id]
-        logger.info(f"Nettoyage : {len(to_delete)} jobs supprimés (plus de {days} jours)")
+        logger.info(
+            f"Nettoyage : {len(to_delete)} jobs supprimés "
+            f"(plus de {days} jours)"
+        )
         return len(to_delete)
 
-    # ==========================================================================
-    #  Utilitaires
-    # ==========================================================================
+    # ======================================================================
+    #  Helpers privés (compatibilité JobInMemory / SQLAlchemy Job)
+    # ======================================================================
 
-    def get_stats(self) -> Dict[str, int]:
+    @staticmethod
+    def _job_is_active(job: JobInMemory) -> bool:
+        """Fallback si JobInMemory n'expose pas is_active()."""
+        if hasattr(job, "is_active") and callable(job.is_active):
+            return job.is_active()
+        return job.status in (
+            JobStatus.PENDING,
+            JobStatus.RUNNING,
+            JobStatus.WAITING,
+            JobStatus.PAUSED,
+        )
+
+    @staticmethod
+    def _job_is_finished(job: JobInMemory) -> bool:
+        """Fallback si JobInMemory n'expose pas is_finished()."""
+        if hasattr(job, "is_finished") and callable(job.is_finished):
+            return job.is_finished()
+        return job.status in (
+            JobStatus.COMPLETED,
+            JobStatus.FAILED,
+            JobStatus.CANCELLED,
+        )
+
+    # ======================================================================
+    #  Statistiques
+    # ======================================================================
+
+    async def get_stats(self) -> Dict[str, int]:
         """Retourne des statistiques sur les jobs."""
         async with self._lock:
             total = len(self._jobs)
-            pending = sum(1 for j in self._jobs.values() if j.status == JobStatus.PENDING)
-            running = sum(1 for j in self._jobs.values() if j.status == JobStatus.RUNNING)
-            completed = sum(1 for j in self._jobs.values() if j.status == JobStatus.COMPLETED)
-            failed = sum(1 for j in self._jobs.values() if j.status == JobStatus.FAILED)
-            cancelled = sum(1 for j in self._jobs.values() if j.status == JobStatus.CANCELLED)
+            pending = sum(
+                1 for j in self._jobs.values() if j.status == JobStatus.PENDING
+            )
+            running = sum(
+                1 for j in self._jobs.values() if j.status == JobStatus.RUNNING
+            )
+            completed = sum(
+                1 for j in self._jobs.values()
+                if j.status == JobStatus.COMPLETED
+            )
+            failed = sum(
+                1 for j in self._jobs.values() if j.status == JobStatus.FAILED
+            )
+            cancelled = sum(
+                1 for j in self._jobs.values()
+                if j.status == JobStatus.CANCELLED
+            )
             return {
                 "total": total,
                 "pending": pending,
                 "running": running,
                 "completed": completed,
                 "failed": failed,
-                "cancelled": cancelled
+                "cancelled": cancelled,
             }
