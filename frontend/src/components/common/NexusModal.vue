@@ -29,6 +29,7 @@
         @mouseup="handleOverlayMouseUp"
       >
         <div
+          ref="modalRef"
           class="nexus-modal"
           :class="[
             `nexus-modal--${size}`,
@@ -319,7 +320,7 @@ function close() {
   // Restaurer le scroll
   document.body.style.overflow = ''
   // Restaurer le focus
-  if (previousActiveElement.value) {
+  if (previousActiveElement.value && typeof previousActiveElement.value.focus === 'function') {
     previousActiveElement.value.focus()
   }
 }
@@ -344,6 +345,14 @@ function handleOverlayClick(event) {
   }
 }
 
+function handleOverlayMouseDown() {
+  // no-op : conservé pour compatibilité avec le template
+}
+
+function handleOverlayMouseUp() {
+  // no-op : conservé pour compatibilité avec le template
+}
+
 // ==========================================================================
 //  Focus trap
 // ==========================================================================
@@ -359,7 +368,9 @@ function trapFocus() {
     'select:not([disabled])',
     '[tabindex]:not([tabindex="-1"]):not([disabled])',
   ]
-  focusableElements.value = modalRef.value.querySelectorAll(selectors.join(', '))
+  focusableElements.value = Array.from(
+    modalRef.value.querySelectorAll(selectors.join(', '))
+  )
   if (focusableElements.value.length > 0) {
     focusableElements.value[0].focus()
   }
@@ -387,27 +398,27 @@ function handleKeydown(event) {
 //  Events de transition
 // ==========================================================================
 
-function beforeEnter(el) {
+function beforeEnter() {
   emit('before-enter')
 }
 
-function enter(el) {
+function enter() {
   emit('enter')
 }
 
-function afterEnter(el) {
+function afterEnter() {
   emit('after-enter')
 }
 
-function beforeLeave(el) {
+function beforeLeave() {
   emit('before-leave')
 }
 
-function leave(el) {
+function leave() {
   emit('leave')
 }
 
-function afterLeave(el) {
+function afterLeave() {
   emit('after-leave')
 }
 
@@ -420,8 +431,13 @@ watch(
   (newVal) => {
     if (newVal) {
       open()
-    } else {
-      close()
+    } else if (isOpen.value) {
+      // Fermeture pilotée par le parent : ne pas ré-émettre update:modelValue
+      isOpen.value = false
+      document.body.style.overflow = ''
+      if (previousActiveElement.value && typeof previousActiveElement.value.focus === 'function') {
+        previousActiveElement.value.focus()
+      }
     }
   },
   { immediate: true }
@@ -574,7 +590,7 @@ $modal-radius-xl: var(--radius-xl, 16px);
 
   // Rounded (coins)
   &--rounded {
-    border-radius: var(--modal-radius, $modal-radius-md);
+    border-radius: var(--modal-radius, #{$modal-radius-md});
   }
 }
 
@@ -659,9 +675,9 @@ $modal-radius-xl: var(--radius-xl, 16px);
   &::-webkit-scrollbar-thumb {
     background: var(--color-border, #1a2538);
     border-radius: 3px;
-    &:hover {
-      background: var(--color-text-muted, #6a7a9a);
-    }
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #6a7a9a);
   }
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) var(--color-bg-secondary);
@@ -791,8 +807,9 @@ $modal-radius-xl: var(--radius-xl, 16px);
       background: var(--color-bg-hover, #e3e8ef);
     }
   }
-  .nexus-modal-overlay {
-    background: rgba(0, 0, 0, 0.4);
-  }
+}
+
+.light-mode .nexus-modal-overlay {
+  background: rgba(0, 0, 0, 0.4);
 }
 </style>
