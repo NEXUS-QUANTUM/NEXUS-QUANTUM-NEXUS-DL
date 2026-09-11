@@ -1,6 +1,7 @@
 # ==========================================================================
 #  NexusDL 2.0 - Main Application
 #  Fichier : backend/app/main.py
+#  Version : 2.0.0-final
 # ==========================================================================
 
 import logging
@@ -12,7 +13,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
 import uvicorn
 
 from app.core.config import settings
@@ -33,34 +35,34 @@ from app.providers.registry import ProviderRegistry
 # ==========================================================================
 
 log_dir = Path("logs")
-log_dir.mkdir(exist_ok=True)
+log_dir.mkdir(parents=True, exist_ok=True)
 
-# Niveau de log
-log_level = getattr(logging, settings.LOG_LEVEL, logging.INFO)
+# getattr avec fallback sur Settings : si LOG_LEVEL n'existe pas, on prend "INFO"
+_log_level_name = getattr(settings, "LOG_LEVEL", "INFO")
+if not isinstance(_log_level_name, str):
+    _log_level_name = "INFO"
+log_level = getattr(logging, _log_level_name.upper(), logging.INFO)
 
-# Format des logs
 log_format = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
 date_format = "%Y-%m-%d %H:%M:%S"
 
-# Configuration des handlers
 handlers = [
     logging.StreamHandler(sys.stdout),
     RotatingFileHandler(
         log_dir / "nexusdl.log",
         maxBytes=10_485_760,  # 10 MB
         backupCount=5,
-        encoding="utf-8"
-    )
+        encoding="utf-8",
+    ),
 ]
 
 logging.basicConfig(
     level=log_level,
     format=log_format,
     datefmt=date_format,
-    handlers=handlers
+    handlers=handlers,
 )
 
-# Désactiver les logs trop verboux des bibliothèques tierces
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("playwright").setLevel(logging.WARNING)
@@ -68,83 +70,100 @@ logging.getLogger("playwright").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ==========================================================================
-#  Middleware personnalisé : Temps de réponse
+#  Helper : lecture de settings avec fallback (au cas où un attribut manque)
 # ==========================================================================
 
-class TimingMiddleware:
-    """
-    Middleware pour mesurer le temps de réponse des requêtes.
-    Ajoute un header X-Response-Time.
-    """
-    async def __call__(self, request: Request, call_next):
+def _s(name, default):
+    """Lecture défensive d'un attribut de settings."""
+    value = getattr(settings, name, default)
+    return default if value is None else value
+
+APP_NAME = _s("APP_NAME", "NexusDL")
+APP_VERSION = _s("APP_VERSION", "2.0.0")
+APP_DESCRIPTION = _s("APP_DESCRIPTION", "Moteur universel de téléchargement")
+ENV = _s("ENV", "production")
+DEBUG = bool(_s("DEBUG", False))
+DATABASE_URL = _s("DATABASE_URL", "sqlite:///./data/nexus.db")
+HOST = _s("HOST", "0.0.0.0")
+PORT = int(_s("PORT", 8000))
+CORS_ORIGINS = _s("CORS_ORIGINS_LIST", None) or _s("CORS_ORIGINS", ["*"])
+
+# ==========================================================================
+#  Middleware : Temps de réponse
+# ==========================================================================
+
+class TimingMiddleware(BaseHTTPMiddleware):
+    """Mesure le temps de réponse et ajoute un header X-Response-Time."""
+
+    async def dispatch(self, request: Request, call_next):
         start_time = time.perf_counter()
         response = await call_next(request)
         process_time = time.perf_counter() - start_time
+
         response.headers["X-Response-Time"] = f"{process_time:.4f}s"
-        # Log des requêtes lentes (plus de 5 secondes)
+
         if process_time > 5.0:
             logger.warning(
                 f"⏱️ Requête lente : {request.method} {request.url.path} - {process_time:.2f}s"
             )
+
         return response
 
 # ==========================================================================
-#  Cycle de vie de l'application (async context manager)
+#  Cycle de vie (lifespan)
 # ==========================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Gestion du cycle de vie de l'application (startup / shutdown).
-    Utilise le nouveau mécanisme de lifespan de FastAPI (>= 0.93).
-    """
     # --- STARTUP ---
-    logger.info(f"🚀 Démarrage de {settings.APP_NAME} v{settings.APP_VERSION}")
-    logger.info(f"📂 Environnement : {settings.ENV} | Mode debug : {settings.DEBUG}")
-    logger.info(f"🗄️ Base de données : {settings.DATABASE_URL}")
+    logger.info(f"🚀 Démarrage de {APP_NAME} v{APP_VERSION}")
+    logger.info(f"📂 Environnement : {ENV} | Mode debug : {DEBUG}")
+    logger.info(f"🗄️ Base de données : {DATABASE_URL}")
+
+    registry = None
 
     try:
-        # 1. Initialiser les services (providers, job manager, cache, etc.)
         init_services()
+        logger.info("✅ Services initialisés")
 
-        # 2. Créer les tables SQLAlchemy si elles n'existent pas
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Tables SQLAlchemy créées/vérifiées")
 
-        # 3. Vérifier que les providers sont chargés
         registry = ProviderRegistry.get_instance()
-        provider_count = len(registry.get_all_providers())
-        logger.info(f"✅ {provider_count} providers chargés")
+        providers = registry.get_all_providers()
+        logger.info(f"✅ {len(providers)} providers chargés")
 
     except Exception as e:
         logger.error(f"❌ Échec de l'initialisation : {e}", exc_info=True)
         raise
 
-    yield  # L'application tourne ici
+    yield
 
     # --- SHUTDOWN ---
     logger.info("🛑 Arrêt de l'application...")
 
-    # 1. Fermer le DownloadEngine si actif
+    if registry is not None:
+        try:
+            for provider in registry.get_all_providers().values():
+                try:
+                    close = getattr(provider, "close", None)
+                    if callable(close):
+                        await close()
+                except Exception as e:
+                    logger.warning(f"⚠️ Fermeture provider échouée : {e}")
+            logger.info("✅ Providers fermés")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur fermeture providers : {e}")
+
     try:
-        engine_instance = DownloadEngine()
-        await engine_instance.close()
-        logger.info("✅ DownloadEngine fermé")
+        get_instance = getattr(DownloadEngine, "get_instance", None)
+        instance = get_instance() if callable(get_instance) else None
+        if instance is not None and hasattr(instance, "close"):
+            await instance.close()
+            logger.info("✅ DownloadEngine fermé")
     except Exception as e:
         logger.warning(f"⚠️ Erreur fermeture DownloadEngine : {e}")
 
-    # 2. Fermer les sessions des providers
-    try:
-        for provider in registry.get_all_providers().values():
-            try:
-                await provider.close()
-            except Exception as e:
-                logger.warning(f"⚠️ Erreur fermeture provider {provider.id} : {e}")
-        logger.info("✅ Providers fermés")
-    except Exception as e:
-        logger.warning(f"⚠️ Erreur fermeture providers : {e}")
-
-    # 3. Fermer la base de données
     try:
         engine.dispose()
         logger.info("✅ Base de données fermée")
@@ -154,16 +173,16 @@ async def lifespan(app: FastAPI):
     logger.info("✅ Application arrêtée proprement")
 
 # ==========================================================================
-#  Création de l'application FastAPI
+#  Application FastAPI
 # ==========================================================================
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    description=settings.APP_DESCRIPTION,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None,
+    title=APP_NAME,
+    version=APP_VERSION,
+    description=APP_DESCRIPTION,
+    docs_url="/docs" if DEBUG else None,
+    redoc_url="/redoc" if DEBUG else None,
+    openapi_url="/openapi.json" if DEBUG else None,
     lifespan=lifespan,
     contact={
         "name": "NexusDL Community",
@@ -173,108 +192,72 @@ app = FastAPI(
     license_info={
         "name": "GNU General Public License v3.0",
         "url": "https://www.gnu.org/licenses/gpl-3.0.html",
-    }
+    },
 )
 
 # ==========================================================================
 #  Middleware
 # ==========================================================================
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS_LIST,
+    allow_origins=CORS_ORIGINS if isinstance(CORS_ORIGINS, list) else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Response-Time"],
 )
 
-# --- Timing ---
 app.add_middleware(TimingMiddleware)
 
 # ==========================================================================
 #  Routes
 # ==========================================================================
 
-# Versionnage de l'API : toutes les routes sont préfixées par /api/v1
 app.include_router(api_v1_router, prefix="/api/v1")
-
-# ==========================================================================
-#  Endpoints racine et healthcheck
-# ==========================================================================
 
 @app.get("/", tags=["System"])
 async def root():
-    """
-    Point d'entrée racine.
-    Retourne les informations de base de l'application.
-    """
     return {
-        "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "description": settings.APP_DESCRIPTION,
-        "environment": settings.ENV,
-        "debug": settings.DEBUG,
-        "docs": "/docs" if settings.DEBUG else None,
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "description": APP_DESCRIPTION,
+        "environment": ENV,
+        "debug": DEBUG,
+        "docs": "/docs" if DEBUG else None,
         "api": "/api/v1",
     }
 
 @app.get("/health", tags=["System"])
 async def health():
-    """
-    Healthcheck simple pour les orchestrateurs (Docker, Kubernetes, etc.).
-    Retourne le statut de l'application.
-    """
-    return {
-        "status": "healthy",
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-    }
+    return {"status": "healthy", "app": APP_NAME, "version": APP_VERSION}
 
 # ==========================================================================
-#  Gestionnaire d'exceptions global
+#  Gestionnaires d'exceptions
 # ==========================================================================
 
 @app.exception_handler(NexusDLError)
 async def nexusdl_exception_handler(request: Request, exc: NexusDLError):
-    """
-    Gère toutes les exceptions personnalisées de NexusDL.
-    """
     status_code = get_http_status_for_exception(exc)
     logger.warning(f"⚠️ {exc.__class__.__name__}: {exc.message}")
     return JSONResponse(
         status_code=status_code,
-        content={
-            "error": True,
-            "detail": exc.message,
-            "type": exc.__class__.__name__,
-        }
+        content={"error": True, "detail": exc.message, "type": exc.__class__.__name__},
     )
 
 @app.exception_handler(AuthenticationError)
 async def auth_exception_handler(request: Request, exc: AuthenticationError):
-    """
-    Gère les erreurs d'authentification avec le header WWW-Authenticate.
-    """
     logger.warning(f"🔐 Auth error: {exc.message}")
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         headers={"WWW-Authenticate": "Bearer"},
-        content={
-            "error": True,
-            "detail": exc.message,
-            "type": "AuthenticationError",
-        }
+        content={"error": True, "detail": exc.message, "type": "AuthenticationError"},
     )
 
 @app.exception_handler(RateLimitError)
 async def rate_limit_exception_handler(request: Request, exc: RateLimitError):
-    """
-    Gère les erreurs de rate limiting avec le header Retry-After.
-    """
     headers = {}
-    if exc.retry_after:
+    if getattr(exc, "retry_after", None):
         headers["Retry-After"] = str(exc.retry_after)
     logger.warning(f"🚦 Rate limit: {exc.message}")
     return JSONResponse(
@@ -283,19 +266,16 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitError):
         content={
             "error": True,
             "detail": exc.message,
-            "retry_after": exc.retry_after,
+            "retry_after": getattr(exc, "retry_after", None),
             "type": "RateLimitError",
-        }
+        },
     )
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Gestionnaire de dernier recours pour toutes les autres exceptions.
-    """
     logger.error(
         f"❌ Exception non gérée sur {request.method} {request.url.path}",
-        exc_info=True
+        exc_info=True,
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -303,18 +283,18 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": True,
             "detail": "Internal server error",
             "type": "InternalServerError",
-        }
+        },
     )
 
 # ==========================================================================
-#  Point d'entrée pour l'exécution directe
+#  Point d'entrée direct
 # ==========================================================================
 
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
+        host=HOST,
+        port=PORT,
+        reload=DEBUG,
+        log_level=_log_level_name.lower(),
     )
